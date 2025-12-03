@@ -269,6 +269,67 @@
             display: block;
         }
 
+        /* Column selector */
+        .column-selector {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .column-selector-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .column-selector-header:hover {
+            color: var(--text-primary);
+        }
+
+        .column-options {
+            display: none;
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .column-selector.expanded .column-options {
+            display: flex;
+        }
+
+        .column-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .column-option:hover {
+            border-color: var(--accent);
+        }
+
+        .column-option.active {
+            border-color: var(--accent);
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .column-option input {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent);
+        }
+
         /* Tabs */
         .tabs {
             display: flex;
@@ -330,32 +391,44 @@
             padding: 16px;
             max-height: 500px;
             overflow-y: auto;
+            overflow-x: auto;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            line-height: 1.8;
+            font-size: 0.75rem;
+            line-height: 1.6;
         }
 
-        .trade-line {
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        .trades-table th {
+            text-align: left;
             padding: 8px 12px;
-            border-radius: 4px;
-            margin-bottom: 4px;
             background: var(--bg-secondary);
-            display: grid;
-            grid-template-columns: 100px 120px 1fr;
-            gap: 16px;
-            align-items: center;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
         }
 
-        .trade-line:hover {
-            background: var(--border);
+        .trades-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .trades-table tr:hover td {
+            background: var(--bg-secondary);
         }
 
         .trade-market {
             color: var(--accent);
-            font-weight: 500;
-        }
-
-        .trade-side {
             font-weight: 500;
         }
 
@@ -367,20 +440,20 @@
             color: #ef4444;
         }
 
-        .trade-details {
-            color: var(--text-secondary);
-        }
-
-        .trade-pnl {
-            font-weight: 500;
-        }
-
         .trade-pnl.profit {
             color: #22c55e;
         }
 
         .trade-pnl.loss {
             color: #ef4444;
+        }
+
+        .tx-hash {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .security-note {
@@ -414,6 +487,7 @@
 
         .results-box::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
 
         .results-box::-webkit-scrollbar-track {
@@ -484,6 +558,16 @@
         <!-- Step 3: Results -->
         <div class="card hidden" id="resultsCard">
             <div class="card-title">Trade History</div>
+            
+            <!-- Column Selector -->
+            <div class="column-selector expanded" id="columnSelector">
+                <div class="column-selector-header" onclick="toggleColumnSelector()">
+                    <span>📊 Select Columns to Display/Export</span>
+                    <span id="toggleIcon">▼</span>
+                </div>
+                <div class="column-options" id="columnOptions"></div>
+            </div>
+            
             <div id="accountTabs" class="tabs"></div>
             <div id="accountContents"></div>
         </div>
@@ -500,6 +584,67 @@
         // State
         let accountIndexes = [];
         let fetchedData = {}; // { accountIndex: { trades: [...], ... } }
+        
+        // All available columns with display names and default visibility
+        const ALL_COLUMNS = {
+            trade_id: { label: 'Trade ID', default: false },
+            tx_hash: { label: 'Tx Hash', default: false },
+            market: { label: 'Market', default: true },
+            side: { label: 'Side', default: true },
+            datetime_utc: { label: 'Date/Time', default: true },
+            trade_value_usd: { label: 'Value ($)', default: true },
+            size: { label: 'Size', default: true },
+            price_usd: { label: 'Price ($)', default: true },
+            fee_usd: { label: 'Fee ($)', default: true },
+            role: { label: 'Role', default: true },
+            trade_type: { label: 'Type', default: true },
+            pnl_usd: { label: 'PnL ($)', default: true }
+        };
+        
+        // Track selected columns
+        let selectedColumns = {};
+        
+        // Initialize selected columns from defaults
+        function initColumnSelection() {
+            Object.keys(ALL_COLUMNS).forEach(col => {
+                selectedColumns[col] = ALL_COLUMNS[col].default;
+            });
+            renderColumnOptions();
+        }
+        
+        // Render column checkboxes
+        function renderColumnOptions() {
+            const container = document.getElementById('columnOptions');
+            container.innerHTML = Object.entries(ALL_COLUMNS).map(([key, config]) => `
+                <label class="column-option ${selectedColumns[key] ? 'active' : ''}" onclick="toggleColumn('${key}')">
+                    <input type="checkbox" ${selectedColumns[key] ? 'checked' : ''} onchange="toggleColumn('${key}')" onclick="event.stopPropagation()">
+                    ${config.label}
+                </label>
+            `).join('');
+        }
+        
+        // Toggle column visibility
+        function toggleColumn(columnKey) {
+            selectedColumns[columnKey] = !selectedColumns[columnKey];
+            renderColumnOptions();
+            // Re-render results if we have data
+            if (Object.keys(fetchedData).length > 0) {
+                displayResults();
+            }
+        }
+        
+        // Toggle column selector expand/collapse
+        function toggleColumnSelector() {
+            const selector = document.getElementById('columnSelector');
+            const icon = document.getElementById('toggleIcon');
+            selector.classList.toggle('expanded');
+            icon.textContent = selector.classList.contains('expanded') ? '▼' : '▶';
+        }
+        
+        // Get list of visible columns
+        function getVisibleColumns() {
+            return Object.keys(selectedColumns).filter(col => selectedColumns[col]);
+        }
 
         // Show status message
         function showStatus(elementId, message, type = 'loading') {
@@ -659,7 +804,8 @@
 
                 showStatus('fetchStatus', `Successfully fetched ${totalTrades} trades`, 'success');
                 
-                // Display results
+                // Initialize column selection and display results
+                initColumnSelection();
                 displayResults();
                 document.getElementById('resultsCard').classList.remove('hidden');
 
@@ -679,6 +825,7 @@
             contentsContainer.innerHTML = '';
 
             const accountIds = Object.keys(fetchedData);
+            const visibleCols = getVisibleColumns();
             
             accountIds.forEach((accountIndex, i) => {
                 const accountData = fetchedData[accountIndex];
@@ -710,13 +857,66 @@
                             </button>
                         </div>
                         <div class="results-box">
-                            ${accountData.trades.map(formatTradeLine).join('')}
+                            ${buildTradesTable(accountData.trades, visibleCols)}
                         </div>
                     `;
                 }
 
                 contentsContainer.appendChild(content);
             });
+        }
+
+        // Build trades table HTML
+        function buildTradesTable(trades, visibleCols) {
+            if (visibleCols.length === 0) {
+                return '<p style="color: var(--text-secondary); padding: 20px;">No columns selected. Use the column selector above.</p>';
+            }
+            
+            // Build header
+            let html = '<table class="trades-table"><thead><tr>';
+            visibleCols.forEach(col => {
+                html += `<th>${ALL_COLUMNS[col].label}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            // Build rows
+            trades.forEach(trade => {
+                html += '<tr>';
+                visibleCols.forEach(col => {
+                    html += `<td>${formatCell(trade, col)}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        // Format cell value based on column type
+        function formatCell(trade, col) {
+            const value = trade[col];
+            
+            switch(col) {
+                case 'market':
+                    return `<span class="trade-market">${value}</span>`;
+                case 'side':
+                    const sideClass = value.toLowerCase().includes('long') ? 'long' : 'short';
+                    return `<span class="trade-side ${sideClass}">${value}</span>`;
+                case 'trade_value_usd':
+                case 'price_usd':
+                    return `$${value.toFixed(2)}`;
+                case 'fee_usd':
+                    return `$${value.toFixed(4)}`;
+                case 'pnl_usd':
+                    if (value === null) return '-';
+                    const pnlClass = value >= 0 ? 'profit' : 'loss';
+                    const sign = value >= 0 ? '+' : '';
+                    return `<span class="trade-pnl ${pnlClass}">${sign}$${value.toFixed(2)}</span>`;
+                case 'tx_hash':
+                    return `<span class="tx-hash" title="${value}">${value.substring(0, 16)}...</span>`;
+                default:
+                    return value;
+            }
         }
 
         // Switch tab
@@ -730,35 +930,7 @@
             document.getElementById(`content-${accountIndex}`).classList.add('active');
         }
 
-        // Format trade line
-        function formatTradeLine(trade) {
-            const sideClass = trade.side.toLowerCase().includes('long') ? 'long' : 'short';
-            
-            let pnlHtml = '';
-            if (trade.pnl_usd !== null) {
-                const pnlClass = trade.pnl_usd >= 0 ? 'profit' : 'loss';
-                const pnlSign = trade.pnl_usd >= 0 ? '+' : '';
-                pnlHtml = `<span class="trade-pnl ${pnlClass}">${pnlSign}$${trade.pnl_usd.toFixed(2)}</span>`;
-            }
-
-            return `
-                <div class="trade-line">
-                    <span class="trade-market">${trade.market}</span>
-                    <span class="trade-side ${sideClass}">${trade.side}</span>
-                    <span class="trade-details">
-                        ${trade.datetime_utc} · 
-                        $${trade.trade_value_usd.toFixed(2)} · 
-                        ${trade.size} @ $${trade.price_usd} · 
-                        Fee: $${trade.fee_usd.toFixed(4)} · 
-                        ${trade.role} · 
-                        ${trade.trade_type}
-                        ${pnlHtml}
-                    </span>
-                </div>
-            `;
-        }
-
-        // Export CSV for a specific account
+        // Export CSV for a specific account (only selected columns)
         function exportCSV(accountIndex) {
             const accountData = fetchedData[accountIndex];
             if (!accountData || !accountData.trades || accountData.trades.length === 0) {
@@ -767,31 +939,26 @@
             }
 
             const trades = accountData.trades;
+            const visibleCols = getVisibleColumns();
+            
+            if (visibleCols.length === 0) {
+                alert('Please select at least one column to export');
+                return;
+            }
             
             // CSV header
-            const headers = [
-                'trade_id', 'market', 'side', 'datetime_utc', 
-                'trade_value_usd', 'size', 'price_usd', 'fee_usd',
-                'role', 'trade_type', 'pnl_usd'
-            ];
+            const headers = visibleCols.map(col => ALL_COLUMNS[col].label);
             
             // Build CSV content
             const csvRows = [headers.join(',')];
             
             for (const trade of trades) {
-                const row = [
-                    trade.trade_id,
-                    `"${trade.market}"`,
-                    `"${trade.side}"`,
-                    `"${trade.datetime_utc}"`,
-                    trade.trade_value_usd,
-                    trade.size,
-                    trade.price_usd,
-                    trade.fee_usd,
-                    `"${trade.role}"`,
-                    `"${trade.trade_type}"`,
-                    trade.pnl_usd !== null ? trade.pnl_usd : ''
-                ];
+                const row = visibleCols.map(col => {
+                    const value = trade[col];
+                    if (value === null || value === undefined) return '';
+                    if (typeof value === 'string') return `"${value.replace(/"/g, '""')}"`;
+                    return value;
+                });
                 csvRows.push(row.join(','));
             }
             
@@ -815,6 +982,9 @@
             a.click();
             a.remove();
         }
+        
+        // Initialize on page load
+        initColumnSelection();
     </script>
 </body>
 </html>

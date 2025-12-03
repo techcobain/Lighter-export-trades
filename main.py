@@ -51,6 +51,7 @@ class FetchTradesRequest(BaseModel):
 class TradeData(BaseModel):
     """Processed trade data for display."""
     trade_id: int
+    tx_hash: str
     market: str
     side: str
     datetime_utc: str
@@ -149,37 +150,61 @@ async def create_auth_token(private_key: str, account_index: int, api_key_index:
             await client.close()
 
 
-def determine_side(trade: dict, account_index: int) -> str:
+def is_user_taker(trade: dict, account_index: int) -> bool:
     """
-    Determine the trade side (Long/Short, Open/Close) based on trade data.
+    Determine if the user (account_index) is the taker in this trade.
+    - is_maker_ask=True: Maker placed an ask (selling), so taker is buyer (bid_account_id)
+    - is_maker_ask=False: Maker placed a bid (buying), so taker is seller (ask_account_id)
     """
     is_maker_ask = trade.get("is_maker_ask", False)
     bid_account_id = trade.get("bid_account_id")
     ask_account_id = trade.get("ask_account_id")
     
-    is_taker = bid_account_id == account_index if not is_maker_ask else ask_account_id == account_index
-    is_buyer = bid_account_id == account_index
-    
-    # Check if position sign changed (indicates close or flip)
-    position_changed = trade.get("taker_position_sign_changed", False)
-    
-    if is_buyer:
-        if position_changed:
-            return "Close Short → Long" if not is_taker else "Close Short"
-        return "Open Long"
+    if is_maker_ask:
+        # Maker is selling, taker is buying
+        return bid_account_id == account_index
     else:
-        if position_changed:
-            return "Close Long → Short" if not is_taker else "Close Long"
-        return "Open Short"
+        # Maker is buying, taker is selling
+        return ask_account_id == account_index
+
+
+def determine_side(trade: dict, account_index: int) -> str:
+    """
+    Determine the trade side based on trade data.
+    
+    We can only reliably detect closes when position_sign_changed is true.
+    Otherwise, we label by direction (Buy/Sell) since we can't know if
+    it's opening or closing without knowing prior position direction.
+    """
+    is_taker = is_user_taker(trade, account_index)
+    is_buyer = trade.get("bid_account_id") == account_index
+    
+    # Get position sign change flag (only available for takers)
+    if is_taker:
+        position_sign_changed = trade.get("taker_position_sign_changed", False)
+    else:
+        position_sign_changed = False
+    
+    # If position sign changed, we know it's a close (and possibly flip)
+    if position_sign_changed:
+        if is_buyer:
+            return "Close Short"
+        else:
+            return "Close Long"
+    
+    # Without position sign change, we can only say the direction
+    # "Long" means buying, "Short" means selling
+    if is_buyer:
+        return "Long"  # Could be Open Long or Add to Long
+    else:
+        return "Short"  # Could be Open Short or Close Long - we can't tell
 
 
 def calculate_fee_usd(trade: dict, account_index: int, price: float, size: float) -> float:
     """
     Calculate fee in USD. Fee values are in basis points (1 bp = 0.0001).
     """
-    is_taker = (trade.get("bid_account_id") == account_index and not trade.get("is_maker_ask")) or \
-               (trade.get("ask_account_id") == account_index and trade.get("is_maker_ask"))
-    
+    is_taker = is_user_taker(trade, account_index)
     fee_bp = trade.get("taker_fee", 0) if is_taker else trade.get("maker_fee", 0)
     fee_rate = fee_bp / 1_000_000  # Convert from micro basis points
     return price * size * fee_rate
@@ -196,9 +221,8 @@ def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeDat
     price = float(trade.get("price", 0))
     trade_value = float(trade.get("usd_amount", 0))
     
-    # Determine role
-    is_taker = (trade.get("bid_account_id") == account_index and not trade.get("is_maker_ask")) or \
-               (trade.get("ask_account_id") == account_index and trade.get("is_maker_ask"))
+    # Determine role using helper function
+    is_taker = is_user_taker(trade, account_index)
     role = "Taker" if is_taker else "Maker"
     
     # Calculate fee
@@ -212,22 +236,35 @@ def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeDat
     # Determine side
     side = determine_side(trade, account_index)
     
-    # Calculate PnL for closing trades (simplified)
+    # Calculate PnL for closing trades
+    # Only calculate when we have confirmed close (position_sign_changed)
     pnl = None
-    if "Close" in side:
-        # This is a simplified PnL calculation
-        # For accurate PnL, we'd need entry price history
+    is_buyer = trade.get("bid_account_id") == account_index
+    
+    # Get the user's position data before this trade
+    if is_taker:
         entry_quote = float(trade.get("taker_entry_quote_before", 0) or 0)
         position_before = float(trade.get("taker_position_size_before", 0) or 0)
-        if position_before > 0 and entry_quote > 0:
-            entry_price = entry_quote / position_before
-            if "Short" in side:
-                pnl = (entry_price - price) * size  # Profit on short when price drops
-            else:
-                pnl = (price - entry_price) * size  # Profit on long when price rises
+        position_sign_changed = trade.get("taker_position_sign_changed", False)
+    else:
+        entry_quote = float(trade.get("maker_entry_quote_before", 0) or 0)
+        position_before = float(trade.get("maker_position_size_before", 0) or 0)
+        position_sign_changed = False
+    
+    # Calculate PnL only for confirmed closes (position_sign_changed)
+    if position_sign_changed and position_before > 0 and entry_quote > 0:
+        entry_price = entry_quote / position_before
+        
+        if is_buyer:
+            # Buying to close = was short, profit if entry > exit (price dropped)
+            pnl = (entry_price - price) * min(size, position_before)
+        else:
+            # Selling to close = was long, profit if exit > entry (price rose)
+            pnl = (price - entry_price) * min(size, position_before)
     
     return TradeData(
         trade_id=trade.get("trade_id", 0),
+        tx_hash=trade.get("tx_hash", ""),
         market=market_name,
         side=side,
         datetime_utc=datetime_str,
