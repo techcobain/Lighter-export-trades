@@ -36,7 +36,6 @@
             line-height: 1.6;
         }
 
-        /* Subtle grid background */
         body::before {
             content: '';
             position: fixed;
@@ -89,6 +88,15 @@
             margin-bottom: 24px;
         }
 
+        .card-title {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--accent);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -138,14 +146,7 @@
             }
         }
 
-        .btn-group {
-            display: flex;
-            gap: 12px;
-            margin-top: 28px;
-        }
-
         button {
-            flex: 1;
             padding: 14px 24px;
             border: none;
             border-radius: 8px;
@@ -176,9 +177,20 @@
             background: var(--border);
         }
 
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
         }
 
         .status {
@@ -209,6 +221,89 @@
             background: rgba(0, 212, 170, 0.1);
             border: 1px solid rgba(0, 212, 170, 0.3);
             color: var(--success);
+        }
+
+        /* Account selection */
+        .accounts-list {
+            margin-top: 16px;
+        }
+
+        .account-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .account-item.selected {
+            border-color: var(--accent);
+        }
+
+        .account-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .account-header input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+        }
+
+        .account-header label {
+            margin-bottom: 0;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .account-fields {
+            display: none;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .account-item.selected .account-fields {
+            display: block;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px 8px 0 0;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: var(--border);
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         .results-header {
@@ -317,7 +412,6 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Custom scrollbar */
         .results-box::-webkit-scrollbar {
             width: 8px;
         }
@@ -339,6 +433,12 @@
         .hidden {
             display: none !important;
         }
+
+        .error-message {
+            color: var(--error);
+            padding: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -348,95 +448,289 @@
             <p class="subtitle">Fetch and export your trading history from Lighter exchange</p>
         </header>
 
-        <div class="card">
-            <form id="tradesForm">
-                <div class="form-group">
-                    <label for="privateKey">API Private Key</label>
-                    <input 
-                        type="password" 
-                        id="privateKey" 
-                        placeholder="Your API private key (never stored)"
-                        required
-                    >
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="l1Address">L1 Address</label>
-                        <input 
-                            type="text" 
-                            id="l1Address" 
-                            placeholder="0x..."
-                            required
-                        >
-                    </div>
-
-                    <div class="form-group">
-                        <label for="apiKeyIndex">API Key Index</label>
-                        <input 
-                            type="number" 
-                            id="apiKeyIndex" 
-                            placeholder="e.g., 3"
-                            value="0"
-                            min="0"
-                            required
-                        >
-                    </div>
-                </div>
-
-                <div class="btn-group">
-                    <button type="submit" class="btn-primary" id="fetchBtn">
-                        Fetch Trades
-                    </button>
-                    <button type="button" class="btn-secondary" id="exportBtn" disabled>
-                        Export CSV
-                    </button>
-                </div>
-            </form>
-
-            <div id="status" class="status"></div>
+        <!-- Step 1: Lookup Accounts -->
+        <div class="card" id="step1Card">
+            <div class="card-title">Step 1: Lookup Accounts</div>
+            <div class="form-group">
+                <label for="l1Address">L1 Address</label>
+                <input 
+                    type="text" 
+                    id="l1Address" 
+                    placeholder="0x..."
+                    required
+                >
+            </div>
+            <button class="btn-primary" id="lookupBtn" onclick="lookupAccounts()">
+                Lookup Accounts
+            </button>
+            <div id="lookupStatus" class="status"></div>
         </div>
 
-        <div class="card hidden" id="resultsCard">
-            <div class="results-header">
-                <h2>Trade History</h2>
-                <span class="results-stats" id="resultsStats"></span>
+        <!-- Step 2: Select Accounts & Enter Credentials -->
+        <div class="card hidden" id="step2Card">
+            <div class="card-title">Step 2: Select Accounts & Enter Credentials</div>
+            <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem;">
+                Select the accounts you want to fetch trades from. Each account requires its own API credentials.
+            </p>
+            <div id="accountsList" class="accounts-list"></div>
+            <div class="btn-group">
+                <button class="btn-primary" id="fetchBtn" onclick="fetchTrades()">
+                    Fetch Trades
+                </button>
             </div>
-            <div class="results-box" id="resultsBox"></div>
+            <div id="fetchStatus" class="status"></div>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="card hidden" id="resultsCard">
+            <div class="card-title">Trade History</div>
+            <div id="accountTabs" class="tabs"></div>
+            <div id="accountContents"></div>
         </div>
 
         <div class="security-note">
-            <strong>Security Note:</strong> Your private key is only used server-side to generate 
-            authentication tokens. It is never stored, logged, or transmitted to any third party. 
-            This application is <a href="https://github.com" style="color: var(--accent);">open source</a> 
+            <strong>Security Note:</strong> Your private keys are only used server-side to generate 
+            authentication tokens. They are never stored, logged, or transmitted to any third party. 
+            This application is <a href="https://github.com/techcobain/Lighter-export-trades" target="_blank" style="color: var(--accent);">open source</a> 
             for transparency.
         </div>
     </div>
 
     <script>
-        // DOM elements
-        const form = document.getElementById('tradesForm');
-        const fetchBtn = document.getElementById('fetchBtn');
-        const exportBtn = document.getElementById('exportBtn');
-        const statusEl = document.getElementById('status');
-        const resultsCard = document.getElementById('resultsCard');
-        const resultsBox = document.getElementById('resultsBox');
-        const resultsStats = document.getElementById('resultsStats');
-
-        // Store last successful fetch data for export
-        let lastFetchData = null;
+        // State
+        let accountIndexes = [];
+        let fetchedData = {}; // { accountIndex: { trades: [...], ... } }
 
         // Show status message
-        function showStatus(message, type = 'loading') {
-            statusEl.textContent = message;
-            statusEl.className = `status show ${type}`;
+        function showStatus(elementId, message, type = 'loading') {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status show ${type}`;
         }
 
-        function hideStatus() {
-            statusEl.className = 'status';
+        function hideStatus(elementId) {
+            document.getElementById(elementId).className = 'status';
         }
 
-        // Format trade line for display
+        // Step 1: Lookup accounts
+        async function lookupAccounts() {
+            const l1Address = document.getElementById('l1Address').value.trim();
+            if (!l1Address) {
+                showStatus('lookupStatus', 'Please enter an L1 address', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('lookupBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Looking up...';
+            showStatus('lookupStatus', 'Fetching account indexes...', 'loading');
+
+            try {
+                const response = await fetch('/api/lookup-accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ l1_address: l1Address })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to lookup accounts');
+                }
+
+                accountIndexes = data.account_indexes;
+                showStatus('lookupStatus', `Found ${accountIndexes.length} account(s)`, 'success');
+                
+                // Build account selection UI
+                buildAccountsList();
+                document.getElementById('step2Card').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus('lookupStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Lookup Accounts';
+            }
+        }
+
+        // Build accounts list with checkboxes and credential fields
+        function buildAccountsList() {
+            const container = document.getElementById('accountsList');
+            container.innerHTML = '';
+
+            accountIndexes.forEach((index, i) => {
+                const isFirst = i === 0;
+                const div = document.createElement('div');
+                div.className = `account-item ${isFirst ? 'selected' : ''}`;
+                div.id = `account-${index}`;
+                div.innerHTML = `
+                    <div class="account-header">
+                        <input type="checkbox" id="check-${index}" ${isFirst ? 'checked' : ''} 
+                            onchange="toggleAccount(${index})">
+                        <label for="check-${index}">Account Index: <strong>${index}</strong></label>
+                    </div>
+                    <div class="account-fields">
+                        <div class="form-group">
+                            <label>API Private Key</label>
+                            <input type="password" id="key-${index}" placeholder="Your API private key">
+                        </div>
+                        <div class="form-group">
+                            <label>API Key Index</label>
+                            <input type="number" id="keyIndex-${index}" value="0" min="0">
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Toggle account selection
+        function toggleAccount(index) {
+            const item = document.getElementById(`account-${index}`);
+            const checkbox = document.getElementById(`check-${index}`);
+            if (checkbox.checked) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        }
+
+        // Get selected accounts with credentials
+        function getSelectedAccounts() {
+            const accounts = [];
+            accountIndexes.forEach(index => {
+                const checkbox = document.getElementById(`check-${index}`);
+                if (checkbox && checkbox.checked) {
+                    const privateKey = document.getElementById(`key-${index}`).value.trim();
+                    const apiKeyIndex = parseInt(document.getElementById(`keyIndex-${index}`).value) || 0;
+                    
+                    if (!privateKey) {
+                        throw new Error(`Please enter API private key for account ${index}`);
+                    }
+                    
+                    accounts.push({
+                        account_index: index,
+                        private_key: privateKey,
+                        api_key_index: apiKeyIndex
+                    });
+                }
+            });
+            return accounts;
+        }
+
+        // Step 2: Fetch trades
+        async function fetchTrades() {
+            let accounts;
+            try {
+                accounts = getSelectedAccounts();
+            } catch (error) {
+                showStatus('fetchStatus', error.message, 'error');
+                return;
+            }
+
+            if (accounts.length === 0) {
+                showStatus('fetchStatus', 'Please select at least one account', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('fetchBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Fetching...';
+            showStatus('fetchStatus', `Fetching trades for ${accounts.length} account(s)... This may take a while.`, 'loading');
+
+            try {
+                const response = await fetch('/api/fetch-trades', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accounts })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to fetch trades');
+                }
+
+                fetchedData = data.accounts;
+                
+                // Count total trades
+                let totalTrades = 0;
+                Object.values(fetchedData).forEach(acc => {
+                    totalTrades += acc.total_trades || 0;
+                });
+
+                showStatus('fetchStatus', `Successfully fetched ${totalTrades} trades`, 'success');
+                
+                // Display results
+                displayResults();
+                document.getElementById('resultsCard').classList.remove('hidden');
+
+            } catch (error) {
+                showStatus('fetchStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Fetch Trades';
+            }
+        }
+
+        // Display results with tabs
+        function displayResults() {
+            const tabsContainer = document.getElementById('accountTabs');
+            const contentsContainer = document.getElementById('accountContents');
+            tabsContainer.innerHTML = '';
+            contentsContainer.innerHTML = '';
+
+            const accountIds = Object.keys(fetchedData);
+            
+            accountIds.forEach((accountIndex, i) => {
+                const accountData = fetchedData[accountIndex];
+                const isFirst = i === 0;
+
+                // Create tab
+                const tab = document.createElement('div');
+                tab.className = `tab ${isFirst ? 'active' : ''}`;
+                tab.textContent = `Account #${accountIndex}`;
+                tab.onclick = () => switchTab(accountIndex);
+                tab.id = `tab-${accountIndex}`;
+                tabsContainer.appendChild(tab);
+
+                // Create content
+                const content = document.createElement('div');
+                content.className = `tab-content ${isFirst ? 'active' : ''}`;
+                content.id = `content-${accountIndex}`;
+
+                if (!accountData.success) {
+                    content.innerHTML = `<div class="error-message">Error: ${accountData.error}</div>`;
+                } else if (accountData.trades.length === 0) {
+                    content.innerHTML = `<div class="error-message">No trades found for this account</div>`;
+                } else {
+                    content.innerHTML = `
+                        <div class="results-header">
+                            <span class="results-stats">${accountData.total_trades} trades</span>
+                            <button class="btn-secondary btn-small" onclick="exportCSV(${accountIndex})">
+                                Export CSV
+                            </button>
+                        </div>
+                        <div class="results-box">
+                            ${accountData.trades.map(formatTradeLine).join('')}
+                        </div>
+                    `;
+                }
+
+                contentsContainer.appendChild(content);
+            });
+        }
+
+        // Switch tab
+        function switchTab(accountIndex) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${accountIndex}`).classList.add('active');
+
+            // Update contents
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`content-${accountIndex}`).classList.add('active');
+        }
+
+        // Format trade line
         function formatTradeLine(trade) {
             const sideClass = trade.side.toLowerCase().includes('long') ? 'long' : 'short';
             
@@ -464,140 +758,63 @@
             `;
         }
 
-        // Display trades
-        function displayTrades(trades, accountIndex) {
-            if (trades.length === 0) {
-                resultsBox.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No trades found</p>';
-            } else {
-                resultsBox.innerHTML = trades.map(formatTradeLine).join('');
+        // Export CSV for a specific account
+        function exportCSV(accountIndex) {
+            const accountData = fetchedData[accountIndex];
+            if (!accountData || !accountData.trades || accountData.trades.length === 0) {
+                alert('No trades to export for this account');
+                return;
+            }
+
+            const trades = accountData.trades;
+            
+            // CSV header
+            const headers = [
+                'trade_id', 'market', 'side', 'datetime_utc', 
+                'trade_value_usd', 'size', 'price_usd', 'fee_usd',
+                'role', 'trade_type', 'pnl_usd'
+            ];
+            
+            // Build CSV content
+            const csvRows = [headers.join(',')];
+            
+            for (const trade of trades) {
+                const row = [
+                    trade.trade_id,
+                    `"${trade.market}"`,
+                    `"${trade.side}"`,
+                    `"${trade.datetime_utc}"`,
+                    trade.trade_value_usd,
+                    trade.size,
+                    trade.price_usd,
+                    trade.fee_usd,
+                    `"${trade.role}"`,
+                    `"${trade.trade_type}"`,
+                    trade.pnl_usd !== null ? trade.pnl_usd : ''
+                ];
+                csvRows.push(row.join(','));
             }
             
-            resultsStats.textContent = `${trades.length} trades from account #${accountIndex}`;
-            resultsCard.classList.remove('hidden');
+            const csvContent = csvRows.join('\n');
+            
+            // Generate filename
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_trades_account_${accountIndex}_${timestamp}.csv`;
+
+            // Download
+            const BOM = '\uFEFF';
+            const encodedContent = encodeURIComponent(BOM + csvContent);
+            const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = dataUri;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
         }
-
-        // Fetch trades
-        async function fetchTrades(e) {
-            e.preventDefault();
-
-            const privateKey = document.getElementById('privateKey').value.trim();
-            const l1Address = document.getElementById('l1Address').value.trim();
-            const apiKeyIndex = parseInt(document.getElementById('apiKeyIndex').value);
-
-            if (!privateKey || !l1Address) {
-                showStatus('Please fill in all required fields', 'error');
-                return;
-            }
-
-            fetchBtn.disabled = true;
-            exportBtn.disabled = true;
-            fetchBtn.innerHTML = '<span class="spinner"></span>Fetching...';
-            showStatus('Connecting and fetching trades... This may take a moment due to rate limits.', 'loading');
-
-            try {
-                const response = await fetch('/api/fetch-trades', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        private_key: privateKey,
-                        l1_address: l1Address,
-                        api_key_index: apiKeyIndex
-                    })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Failed to fetch trades');
-                }
-
-                lastFetchData = data;
-                displayTrades(data.trades, data.account_index);
-                showStatus(`Successfully fetched ${data.total_trades} trades`, 'success');
-                exportBtn.disabled = false;
-
-            } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
-                console.error('Fetch error:', error);
-            } finally {
-                fetchBtn.disabled = false;
-                fetchBtn.textContent = 'Fetch Trades';
-            }
-        }
-
-        // Export CSV (client-side from already fetched data)
-        function exportCSV() {
-            if (!lastFetchData || !lastFetchData.trades || lastFetchData.trades.length === 0) {
-                showStatus('No trades to export. Fetch trades first.', 'error');
-                return;
-            }
-
-            try {
-                const trades = lastFetchData.trades;
-                
-                // CSV header
-                const headers = [
-                    'trade_id', 'market', 'side', 'datetime_utc', 
-                    'trade_value_usd', 'size', 'price_usd', 'fee_usd',
-                    'role', 'trade_type', 'pnl_usd'
-                ];
-                
-                // Build CSV content
-                const csvRows = [headers.join(',')];
-                
-                for (const trade of trades) {
-                    const row = [
-                        trade.trade_id,
-                        `"${trade.market}"`,
-                        `"${trade.side}"`,
-                        `"${trade.datetime_utc}"`,
-                        trade.trade_value_usd,
-                        trade.size,
-                        trade.price_usd,
-                        trade.fee_usd,
-                        `"${trade.role}"`,
-                        `"${trade.trade_type}"`,
-                        trade.pnl_usd !== null ? trade.pnl_usd : ''
-                    ];
-                    csvRows.push(row.join(','));
-                }
-                
-                const csvContent = csvRows.join('\n');
-                
-                // Generate filename with timestamp
-                const now = new Date();
-                const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                const filename = `lighter_trades_${timestamp}.csv`;
-
-                // Add UTF-8 BOM for Excel compatibility
-                const BOM = '\uFEFF';
-                const fullContent = BOM + csvContent;
-                
-                // Use data URI approach for better filename support
-                const encodedContent = encodeURIComponent(fullContent);
-                const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
-                
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = dataUri;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-
-                showStatus('CSV exported successfully', 'success');
-
-            } catch (error) {
-                showStatus(`Export error: ${error.message}`, 'error');
-            }
-        }
-
-        // Event listeners
-        form.addEventListener('submit', fetchTrades);
-        exportBtn.addEventListener('click', exportCSV);
     </script>
 </body>
 </html>
-

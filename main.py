@@ -31,11 +31,21 @@ MARKET_CACHE_TTL = 3600  # 1 hour in seconds
 
 
 # ===== MODELS =====
-class FetchTradesRequest(BaseModel):
-    """Request model for fetching trades."""
+class AccountCredentials(BaseModel):
+    """Credentials for a single account."""
+    account_index: int
     private_key: str
-    l1_address: str
     api_key_index: int
+
+
+class LookupAccountsRequest(BaseModel):
+    """Request model for looking up accounts."""
+    l1_address: str
+
+
+class FetchTradesRequest(BaseModel):
+    """Request model for fetching trades from multiple accounts."""
+    accounts: list[AccountCredentials]
 
 
 class TradeData(BaseModel):
@@ -307,78 +317,84 @@ async def fetch_trades_for_account(
 
 # ===== API ENDPOINTS =====
 
-@app.post("/api/fetch-trades")
-async def fetch_trades(request: FetchTradesRequest):
+@app.post("/api/lookup-accounts")
+async def lookup_accounts(request: LookupAccountsRequest):
     """
-    Main endpoint to fetch all trades for a user.
-    Process: Get first account -> Generate auth -> Fetch trades
-    Note: API keys are tied to specific account indexes, so we only use the first one.
+    Lookup all account indexes for an L1 address.
+    Returns list of account indexes that user can select from.
     """
-    # Fetch market details for name mapping
-    market_map = await fetch_market_details()
-    
-    # Get account indexes from L1 address (use first one only)
     account_indexes = await get_account_indexes(request.l1_address)
     if not account_indexes:
         raise HTTPException(status_code=400, detail="No accounts found for this address")
     
-    # Use only the first account index (API keys are account-specific)
-    account_index = account_indexes[0]
-    
-    # Generate auth token
-    auth_token = await create_auth_token(
-        request.private_key,
-        account_index,
-        request.api_key_index
-    )
-    
-    # Fetch trades for this account
-    all_trades = await fetch_trades_for_account(auth_token, account_index, market_map)
-    
-    # Sort all trades by datetime (newest first)
-    all_trades.sort(key=lambda x: x.datetime_utc, reverse=True)
-    
     return {
         "success": True,
-        "total_trades": len(all_trades),
-        "account_index": account_index,
-        "trades": [t.model_dump() for t in all_trades]
+        "l1_address": request.l1_address,
+        "account_indexes": account_indexes
     }
 
 
-@app.post("/api/export-csv")
-async def export_csv(request: FetchTradesRequest):
+@app.post("/api/fetch-trades")
+async def fetch_trades(request: FetchTradesRequest):
     """
-    Export trades as CSV file.
+    Fetch trades for multiple accounts.
+    Each account has its own credentials (account_index, private_key, api_key_index).
+    Returns trades grouped by account_index.
     """
-    # Reuse fetch logic
-    result = await fetch_trades(request)
-    trades = result["trades"]
+    if not request.accounts:
+        raise HTTPException(status_code=400, detail="No accounts provided")
     
-    if not trades:
-        raise HTTPException(status_code=400, detail="No trades to export")
+    # Fetch market details for name mapping
+    market_map = await fetch_market_details()
     
-    # Create CSV in memory
-    output = io.StringIO()
-    fieldnames = [
-        "trade_id", "market", "side", "datetime_utc", 
-        "trade_value_usd", "size", "price_usd", "fee_usd",
-        "role", "trade_type", "pnl_usd"
-    ]
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
-    writer.writeheader()
-    writer.writerows(trades)
+    # Results grouped by account
+    results = {}
     
-    # Return as downloadable file
-    output.seek(0)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"lighter_trades_{timestamp}.csv"
+    for account in request.accounts:
+        account_index = account.account_index
+        print(f"\n=== Fetching trades for account {account_index} ===")
+        
+        try:
+            # Generate auth token for this account
+            auth_token = await create_auth_token(
+                account.private_key,
+                account_index,
+                account.api_key_index
+            )
+            
+            # Fetch trades
+            trades = await fetch_trades_for_account(auth_token, account_index, market_map)
+            
+            # Sort by datetime (newest first)
+            trades.sort(key=lambda x: x.datetime_utc, reverse=True)
+            
+            results[account_index] = {
+                "success": True,
+                "total_trades": len(trades),
+                "trades": [t.model_dump() for t in trades]
+            }
+            
+        except HTTPException as e:
+            print(f"Error with account {account_index}: {e.detail}")
+            results[account_index] = {
+                "success": False,
+                "error": e.detail,
+                "total_trades": 0,
+                "trades": []
+            }
+        except Exception as e:
+            print(f"Error with account {account_index}: {str(e)}")
+            results[account_index] = {
+                "success": False,
+                "error": str(e),
+                "total_trades": 0,
+                "trades": []
+            }
     
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    return {
+        "success": True,
+        "accounts": results
+    }
 
 
 @app.get("/api/markets")
