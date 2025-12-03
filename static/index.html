@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lighter Trades Fetcher</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a24;
+            --accent: #00d4aa;
+            --accent-dim: #00a888;
+            --text-primary: #e8e8ed;
+            --text-secondary: #8888a0;
+            --border: #2a2a3a;
+            --error: #ff5566;
+            --success: #00d4aa;
+            --warning: #ffaa00;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 212, 170, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 170, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        h1 span {
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 300;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-dim);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--border);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.loading {
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            color: var(--accent);
+        }
+
+        .status.error {
+            background: rgba(255, 85, 102, 0.1);
+            border: 1px solid rgba(255, 85, 102, 0.3);
+            color: var(--error);
+        }
+
+        .status.success {
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            color: var(--success);
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .results-header h2 {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .results-stats {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .results-box {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.8;
+        }
+
+        .trade-line {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            background: var(--bg-secondary);
+            display: grid;
+            grid-template-columns: 100px 120px 1fr;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .trade-line:hover {
+            background: var(--border);
+        }
+
+        .trade-market {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .trade-side {
+            font-weight: 500;
+        }
+
+        .trade-side.long {
+            color: #22c55e;
+        }
+
+        .trade-side.short {
+            color: #ef4444;
+        }
+
+        .trade-details {
+            color: var(--text-secondary);
+        }
+
+        .trade-pnl {
+            font-weight: 500;
+        }
+
+        .trade-pnl.profit {
+            color: #22c55e;
+        }
+
+        .trade-pnl.loss {
+            color: #ef4444;
+        }
+
+        .security-note {
+            margin-top: 32px;
+            padding: 16px;
+            background: rgba(0, 212, 170, 0.05);
+            border: 1px solid rgba(0, 212, 170, 0.2);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .security-note strong {
+            color: var(--accent);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Custom scrollbar */
+        .results-box::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .results-box::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .results-box::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .results-box::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Lighter <span>Trades</span> Fetcher</h1>
+            <p class="subtitle">Fetch and export your trading history from Lighter exchange</p>
+        </header>
+
+        <div class="card">
+            <form id="tradesForm">
+                <div class="form-group">
+                    <label for="privateKey">API Private Key</label>
+                    <input 
+                        type="password" 
+                        id="privateKey" 
+                        placeholder="Your API private key (never stored)"
+                        required
+                    >
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="l1Address">L1 Address</label>
+                        <input 
+                            type="text" 
+                            id="l1Address" 
+                            placeholder="0x..."
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiKeyIndex">API Key Index</label>
+                        <input 
+                            type="number" 
+                            id="apiKeyIndex" 
+                            placeholder="e.g., 3"
+                            value="0"
+                            min="0"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn-primary" id="fetchBtn">
+                        Fetch Trades
+                    </button>
+                    <button type="button" class="btn-secondary" id="exportBtn" disabled>
+                        Export CSV
+                    </button>
+                </div>
+            </form>
+
+            <div id="status" class="status"></div>
+        </div>
+
+        <div class="card hidden" id="resultsCard">
+            <div class="results-header">
+                <h2>Trade History</h2>
+                <span class="results-stats" id="resultsStats"></span>
+            </div>
+            <div class="results-box" id="resultsBox"></div>
+        </div>
+
+        <div class="security-note">
+            <strong>Security Note:</strong> Your private key is only used server-side to generate 
+            authentication tokens. It is never stored, logged, or transmitted to any third party. 
+            This application is <a href="https://github.com" style="color: var(--accent);">open source</a> 
+            for transparency.
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const form = document.getElementById('tradesForm');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const statusEl = document.getElementById('status');
+        const resultsCard = document.getElementById('resultsCard');
+        const resultsBox = document.getElementById('resultsBox');
+        const resultsStats = document.getElementById('resultsStats');
+
+        // Store last successful fetch data for export
+        let lastFetchData = null;
+
+        // Show status message
+        function showStatus(message, type = 'loading') {
+            statusEl.textContent = message;
+            statusEl.className = `status show ${type}`;
+        }
+
+        function hideStatus() {
+            statusEl.className = 'status';
+        }
+
+        // Format trade line for display
+        function formatTradeLine(trade) {
+            const sideClass = trade.side.toLowerCase().includes('long') ? 'long' : 'short';
+            
+            let pnlHtml = '';
+            if (trade.pnl_usd !== null) {
+                const pnlClass = trade.pnl_usd >= 0 ? 'profit' : 'loss';
+                const pnlSign = trade.pnl_usd >= 0 ? '+' : '';
+                pnlHtml = `<span class="trade-pnl ${pnlClass}">${pnlSign}$${trade.pnl_usd.toFixed(2)}</span>`;
+            }
+
+            return `
+                <div class="trade-line">
+                    <span class="trade-market">${trade.market}</span>
+                    <span class="trade-side ${sideClass}">${trade.side}</span>
+                    <span class="trade-details">
+                        ${trade.datetime_utc} · 
+                        $${trade.trade_value_usd.toFixed(2)} · 
+                        ${trade.size} @ $${trade.price_usd} · 
+                        Fee: $${trade.fee_usd.toFixed(4)} · 
+                        ${trade.role} · 
+                        ${trade.trade_type}
+                        ${pnlHtml}
+                    </span>
+                </div>
+            `;
+        }
+
+        // Display trades
+        function displayTrades(trades, accountIndex) {
+            if (trades.length === 0) {
+                resultsBox.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No trades found</p>';
+            } else {
+                resultsBox.innerHTML = trades.map(formatTradeLine).join('');
+            }
+            
+            resultsStats.textContent = `${trades.length} trades from account #${accountIndex}`;
+            resultsCard.classList.remove('hidden');
+        }
+
+        // Fetch trades
+        async function fetchTrades(e) {
+            e.preventDefault();
+
+            const privateKey = document.getElementById('privateKey').value.trim();
+            const l1Address = document.getElementById('l1Address').value.trim();
+            const apiKeyIndex = parseInt(document.getElementById('apiKeyIndex').value);
+
+            if (!privateKey || !l1Address) {
+                showStatus('Please fill in all required fields', 'error');
+                return;
+            }
+
+            fetchBtn.disabled = true;
+            exportBtn.disabled = true;
+            fetchBtn.innerHTML = '<span class="spinner"></span>Fetching...';
+            showStatus('Connecting and fetching trades... This may take a moment due to rate limits.', 'loading');
+
+            try {
+                const response = await fetch('/api/fetch-trades', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        private_key: privateKey,
+                        l1_address: l1Address,
+                        api_key_index: apiKeyIndex
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to fetch trades');
+                }
+
+                lastFetchData = data;
+                displayTrades(data.trades, data.account_index);
+                showStatus(`Successfully fetched ${data.total_trades} trades`, 'success');
+                exportBtn.disabled = false;
+
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                console.error('Fetch error:', error);
+            } finally {
+                fetchBtn.disabled = false;
+                fetchBtn.textContent = 'Fetch Trades';
+            }
+        }
+
+        // Export CSV (client-side from already fetched data)
+        function exportCSV() {
+            if (!lastFetchData || !lastFetchData.trades || lastFetchData.trades.length === 0) {
+                showStatus('No trades to export. Fetch trades first.', 'error');
+                return;
+            }
+
+            try {
+                const trades = lastFetchData.trades;
+                
+                // CSV header
+                const headers = [
+                    'trade_id', 'market', 'side', 'datetime_utc', 
+                    'trade_value_usd', 'size', 'price_usd', 'fee_usd',
+                    'role', 'trade_type', 'pnl_usd'
+                ];
+                
+                // Build CSV content
+                const csvRows = [headers.join(',')];
+                
+                for (const trade of trades) {
+                    const row = [
+                        trade.trade_id,
+                        `"${trade.market}"`,
+                        `"${trade.side}"`,
+                        `"${trade.datetime_utc}"`,
+                        trade.trade_value_usd,
+                        trade.size,
+                        trade.price_usd,
+                        trade.fee_usd,
+                        `"${trade.role}"`,
+                        `"${trade.trade_type}"`,
+                        trade.pnl_usd !== null ? trade.pnl_usd : ''
+                    ];
+                    csvRows.push(row.join(','));
+                }
+                
+                const csvContent = csvRows.join('\n');
+                
+                // Generate filename with timestamp
+                const now = new Date();
+                const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                const filename = `lighter_trades_${timestamp}.csv`;
+
+                // Add UTF-8 BOM for Excel compatibility
+                const BOM = '\uFEFF';
+                const fullContent = BOM + csvContent;
+                
+                // Use data URI approach for better filename support
+                const encodedContent = encodeURIComponent(fullContent);
+                const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = dataUri;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                showStatus('CSV exported successfully', 'success');
+
+            } catch (error) {
+                showStatus(`Export error: ${error.message}`, 'error');
+            }
+        }
+
+        // Event listeners
+        form.addEventListener('submit', fetchTrades);
+        exportBtn.addEventListener('click', exportCSV);
+    </script>
+</body>
+</html>
+

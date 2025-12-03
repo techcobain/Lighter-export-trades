@@ -1,0 +1,13 @@
+# Web framework
+fastapi==0.115.0
+uvicorn==0.30.6
+
+# Lighter SDK for auth token generation (install from GitHub)
+lighter-sdk @ git+https://github.com/elliottech/lighter-python.git
+
+# HTTP client for API calls
+httpx==0.27.2
+
+# For serving static files
+aiofiles==24.1.0
+
