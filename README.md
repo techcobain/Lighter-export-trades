@@ -1,4 +1,4 @@
-# Lighter Trades Fetcher
+# Lighter Data Fetcher
 
 A minimal web app to fetch and export trading history and funding payments from [Lighter Exchange](https://lighter.xyz).
 

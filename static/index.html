@@ -1125,7 +1125,9 @@
             }
 
             const btn = document.getElementById('fetchTradesBtn');
+            const fundingBtn = document.getElementById('fetchFundingBtn');
             btn.disabled = true;
+            fundingBtn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
             
             try {
@@ -1217,6 +1219,7 @@
                 showStatus('fetchStatus', `Error: ${error.message}`, 'error');
             } finally {
                 btn.disabled = false;
+                fundingBtn.disabled = false;
                 btn.textContent = 'Fetch Trades';
             }
         }
