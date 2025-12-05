@@ -1,102 +1,96 @@
 # Lighter Trades Fetcher
 
-A minimal web application to fetch and export your trading history from [Lighter Exchange](https://lighter.xyz).
+A minimal web app to fetch and export trading history and funding payments from [Lighter Exchange](https://lighter.xyz).
 
 ## Features
 
-- Fetch all trades for your Lighter account(s)
-- Display trades with market, side, price, size, fees, and PnL
-- Export trades to CSV for further analysis
-- Handles pagination and rate limits automatically
-- Secure: Private keys are only used server-side for auth token generation
+- **Multi-account support** — Fetch data from multiple sub-accounts simultaneously
+- **Trades & Funding** — Export both trade history and funding payments
+- **Customizable columns** — Choose which fields to display and export
+- **CSV & JSON export** — Per-account downloads in both formats
+- **Automatic pagination** — Handles rate limits and fetches all data
+- **Extended auth** — Option for 60-minute tokens for large datasets
+- **Secure by design** — Private keys only used server-side, never stored
 
 ## Quick Start
 
-### Local Development
-
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd RetrieveTrades
-
-# Create virtual environment
+# Clone and setup
+git clone https://github.com/techcobain/Lighter-export-trades.git
+cd Lighter-export-trades
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Run the server
+# Run
 python main.py
 ```
 
-Visit `http://localhost:8000` in your browser.
+Visit `http://localhost:8000`
 
-### Deploy to Railway
+## Deploy to Railway
 
-1. Push this repository to GitHub
-2. Connect your GitHub repo to [Railway](https://railway.app)
-3. Railway will automatically detect the Python app and deploy
+1. Push to GitHub
+2. Connect repo to [Railway](https://railway.app)
+3. Auto-deploys using `Procfile`
 
-Railway will use the `Procfile` for deployment configuration.
+## Architecture
 
-## Configuration
+| Component | Description |
+|-----------|-------------|
+| Auth tokens | Generated server-side via Lighter SDK |
+| Data fetching | Client-side (rate limits per user IP) |
+| Processing | Server-side (market names, PnL calculation) |
 
-The app is configured for Lighter Mainnet by default. Key settings in `main.py`:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `BASE_URL` | mainnet | Lighter API endpoint |
-| `TRADES_LIMIT` | 100 | Max trades per API call |
-| `RATE_LIMIT_DELAY` | 3.5s | Delay between calls (20/min limit) |
-
-## How It Works
-
-1. **Enter credentials**: Provide your API private key, L1 address, and API key index
-2. **Account lookup**: App fetches your account index(es) from your L1 address
-3. **Auth generation**: Creates a 10-minute auth token using the Lighter SDK
-4. **Fetch trades**: Retrieves all trades with automatic pagination
-5. **Display & Export**: View trades in-browser or download as CSV
+This hybrid approach distributes rate limits across users instead of centralizing them on the server.
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Serves the web interface |
-| `/api/fetch-trades` | POST | Fetch trades for an account |
-| `/api/export-csv` | POST | Export trades as CSV file |
-| `/api/markets` | GET | Get cached market details |
-
-## Trade Data Fields
-
-| Field | Description |
-|-------|-------------|
-| `market` | Trading pair (e.g., BTC, ETH) |
-| `side` | Open Long, Open Short, Close Long, Close Short |
-| `datetime_utc` | Trade timestamp in UTC |
-| `trade_value_usd` | Trade notional value in USD |
-| `size` | Position size in base currency |
-| `price_usd` | Execution price |
-| `fee_usd` | Trading fee in USD |
-| `role` | Maker or Taker |
-| `trade_type` | trade, liquidation, or deleverage |
-| `pnl_usd` | Realized PnL for closing trades |
+| `/` | GET | Web interface |
+| `/api/lookup-accounts` | POST | Get account indexes for L1 address |
+| `/api/generate-auth` | POST | Generate auth tokens (10 or 60 min) |
+| `/api/process-trades` | POST | Process raw trades (add market names, PnL) |
+| `/api/markets` | GET | Cached market details |
 
 ## Security
 
-- **Private keys are never stored** - They're only used in-memory to generate auth tokens
-- **No logging of sensitive data** - Keys are not logged or persisted
-- **Open source** - All code is public for transparency
-- **Server-side only** - Auth happens on the server, not in the browser
+### Implemented Protections
+
+- **Security headers** — CSP, HSTS, X-Frame-Options, X-Content-Type-Options
+- **Rate limiting** — Per-IP limits on all endpoints (DoS protection)
+- **XSS prevention** — All user/API data escaped before DOM insertion
+- **Sanitized errors** — No sensitive data leaked in error messages
+- **No storage** — Keys used only in-memory for token generation
+
+### Headers Added
+
+```
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; ...
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Strict-Transport-Security: max-age=31536000
+```
+
+## Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `BASE_URL` | mainnet | Lighter API endpoint |
+| `TRADES_LIMIT` | 100 | Trades per API call |
+| `RATE_LIMIT_DELAY` | 3.5s | Delay between Lighter API calls |
 
 ## Tech Stack
 
-- **Backend**: FastAPI (Python)
-- **Auth**: Lighter SDK (`lighter` package)
-- **HTTP Client**: httpx
+- **Backend**: FastAPI + Lighter SDK
 - **Frontend**: Vanilla HTML/CSS/JS
+- **HTTP**: httpx (async)
 
 ## License
 
 MIT
 
+---
+
+Built by [Supertramp](https://t.me/heysupertramp)

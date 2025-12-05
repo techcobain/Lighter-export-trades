@@ -513,14 +513,228 @@
             padding: 20px;
             text-align: center;
         }
+
+        /* FAQ Styles */
+        .faq-section {
+            margin-bottom: 32px;
+        }
+
+        .faq-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .faq-main-toggle {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary);
+            transition: background 0.2s;
+        }
+
+        .faq-main-toggle:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .faq-items {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+
+        .faq-items.open {
+            max-height: 1000px;
+        }
+
+        .faq-item {
+            background: var(--bg-tertiary);
+            margin: 0 12px 8px 12px;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .faq-item:first-child {
+            margin-top: 8px;
+        }
+
+        .faq-item:last-child {
+            margin-bottom: 12px;
+        }
+
+        .faq-question {
+            padding: 14px 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            transition: background 0.2s;
+        }
+
+        .faq-question:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .faq-toggle {
+            color: var(--accent);
+            font-size: 1.2rem;
+            transition: transform 0.3s;
+        }
+
+        .faq-container.open > .faq-main-toggle .faq-toggle {
+            transform: rotate(45deg);
+        }
+
+        .faq-item.open .faq-toggle {
+            transform: rotate(45deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .faq-item.open .faq-answer {
+            max-height: 500px;
+        }
+
+        .faq-answer-content {
+            padding: 0 16px 14px 16px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.7;
+        }
+
+        .faq-answer-content a {
+            color: var(--accent);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Lighter <span>Trades</span> Fetcher</h1>
-            <p class="subtitle">Fetch and export your trading history from Lighter exchange</p>
+            <h1>Export <span>Lighter</span> Trading Data</h1>
+            <p class="subtitle">Fetch trading history and funding payments</p>
         </header>
+
+        <!-- FAQ Section -->
+        <div class="faq-section">
+            <div class="faq-container">
+                <div class="faq-main-toggle" onclick="toggleFaqSection()">
+                    <span>Frequently Asked Questions</span>
+                    <span class="faq-toggle" id="faqMainToggle">+</span>
+                </div>
+                <div class="faq-items" id="faqItems">
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <span>Why do you need my API private keys?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <div class="faq-answer-content">
+                                To fetch trades and funding payments, we use these two endpoints: 
+                                <a href="https://apidocs.lighter.xyz/reference/trades#/" target="_blank">trades</a> and 
+                                <a href="https://apidocs.lighter.xyz/reference/positionfunding#/" target="_blank">positionFunding</a>. 
+                                They both require authentication, which is a code generated through an API key tied to the account_index you want to get data for. When you're done exporting, you can simply revoke the API key.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <span>Why do I need to add one for each account under the same address?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <div class="faq-answer-content">
+                                Each account_index, even if under the same address, has its own separate set of API keys. You can have at most 8 sub-accounts, and each sub-account can have at most 255 API keys.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <span>How can I generate API keys?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <div class="faq-answer-content">
+                                Go to <a href="https://app.lighter.xyz/apikeys" target="_blank">app.lighter.xyz/apikeys</a>. 
+                                Even though no data is stored by this web app, after you are done fetching your trades and funding payments 
+                                you should click on "Revoke" on the same page for the API key you used — this way it won't work anymore.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <span>What can you do with my API private key?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <div class="faq-answer-content">
+                                Using an API private key you can trade on the platform, fetch auth-only data, and process withdrawals 
+                                (but only to the same account the Lighter account is tied to, and only via secure withdrawals — 
+                                it is not possible to withdraw to other accounts).
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <span>How long will it take to fetch all my trades and funding payments?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <div class="faq-answer-content">
+                                To avoid rate limits on the platform, we only fetch ~1.7K trades per minute and ~1.7K funding payments per minute. If you have more, you can use the extended auth option you'll find below to fetch up to 100K trades or 360K funding payments.
+                                You should close the Lighter front-end while using this app or you risk getting rate limited. 
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">
+                            <span>How can I export the data fetched?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <div class="faq-answer-content">
+                                You will see the output here in the app, with the option to also download it in a CSV file, or a JSON file 
+                                (this will be the raw JSON we fetched from the Lighter servers). Furthermore, you can customize the fields to see and export.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Step 1: Lookup Accounts -->
         <div class="card" id="step1Card">
@@ -544,12 +758,26 @@
         <div class="card hidden" id="step2Card">
             <div class="card-title">Step 2: Select Accounts & Enter Credentials</div>
             <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem;">
-                Select the accounts you want to fetch trades from. Each account requires its own API credentials.
+                Select the accounts you want to fetch data from. Each account requires its own API credentials.
             </p>
             <div id="accountsList" class="accounts-list"></div>
+            
+            <!-- Extended auth option -->
+            <div style="margin: 20px 0; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
+                    <input type="checkbox" id="extendedAuth" style="width: 18px; height: 18px; accent-color: var(--accent);">
+                    <span style="color: var(--text-secondary); font-size: 0.85rem;">
+                        Extended auth (60 min) — Check if you have more than 15K trades or 15K funding payments
+                    </span>
+                </label>
+            </div>
+            
             <div class="btn-group">
-                <button class="btn-primary" id="fetchBtn" onclick="fetchTrades()">
+                <button class="btn-primary" id="fetchTradesBtn" onclick="fetchTrades()">
                     Fetch Trades
+                </button>
+                <button class="btn-primary" id="fetchFundingBtn" onclick="fetchFunding()">
+                    Fetch Funding
                 </button>
             </div>
             <div id="fetchStatus" class="status"></div>
@@ -562,7 +790,7 @@
             <!-- Column Selector -->
             <div class="column-selector expanded" id="columnSelector">
                 <div class="column-selector-header" onclick="toggleColumnSelector()">
-                    <span>📊 Select Columns to Display/Export</span>
+                    <span>Select Columns to Display/Export</span>
                     <span id="toggleIcon">▼</span>
                 </div>
                 <div class="column-options" id="columnOptions"></div>
@@ -572,18 +800,59 @@
             <div id="accountContents"></div>
         </div>
 
+        <!-- Funding Payments Results -->
+        <div class="card hidden" id="fundingCard">
+            <div class="card-title">Funding Payments</div>
+            <div id="fundingTabs" class="tabs"></div>
+            <div id="fundingContents"></div>
+        </div>
+
         <div class="security-note">
             <strong>Security Note:</strong> Your private keys are only used server-side to generate 
-            authentication tokens. They are never stored, logged, or transmitted to any third party. 
+            authentication tokens. Trade data is fetched directly from your browser to Lighter's API 
+            (rate limits apply to your IP). Keys are never stored or logged.
             This application is <a href="https://github.com/techcobain/Lighter-export-trades" target="_blank" style="color: var(--accent);">open source</a> 
-            for transparency.
+            so you're free to audit the code, and run it locally if you prefer.
+        </div>
+        
+        <div class="footer">
+            Built by <a href="https://t.me/heysupertramp" target="_blank">Supertramp</a>
         </div>
     </div>
 
     <script>
+        // ===== SECURITY: HTML Escaping to prevent XSS =====
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // FAQ Toggle - Main section
+        function toggleFaqSection() {
+            const container = document.querySelector('.faq-container');
+            const items = document.getElementById('faqItems');
+            container.classList.toggle('open');
+            items.classList.toggle('open');
+        }
+        
+        // FAQ Toggle - Individual items
+        function toggleFaq(element) {
+            const faqItem = element.parentElement;
+            faqItem.classList.toggle('open');
+        }
+        
         // State
         let accountIndexes = [];
         let fetchedData = {}; // { accountIndex: { trades: [...], ... } }
+        let rawTradesData = {}; // { accountIndex: [raw trades from API] }
+        let fundingData = {}; // { accountIndex: { fundings: [...], ... } }
+        let rawFundingData = {}; // { accountIndex: [raw funding from API] }
+        let authTokens = {}; // { accountIndex: auth_token } - cached for funding fetch
         
         // All available columns with display names and default visibility
         const ALL_COLUMNS = {
@@ -703,24 +972,28 @@
             container.innerHTML = '';
 
             accountIndexes.forEach((index, i) => {
+                // Validate index is a number to prevent injection
+                const safeIndex = parseInt(index, 10);
+                if (isNaN(safeIndex)) return;
+                
                 const isFirst = i === 0;
                 const div = document.createElement('div');
                 div.className = `account-item ${isFirst ? 'selected' : ''}`;
-                div.id = `account-${index}`;
+                div.id = `account-${safeIndex}`;
                 div.innerHTML = `
                     <div class="account-header">
-                        <input type="checkbox" id="check-${index}" ${isFirst ? 'checked' : ''} 
-                            onchange="toggleAccount(${index})">
-                        <label for="check-${index}">Account Index: <strong>${index}</strong></label>
+                        <input type="checkbox" id="check-${safeIndex}" ${isFirst ? 'checked' : ''} 
+                            onchange="toggleAccount(${safeIndex})">
+                        <label for="check-${safeIndex}">Account Index: <strong>${safeIndex}</strong></label>
                     </div>
                     <div class="account-fields">
                         <div class="form-group">
                             <label>API Private Key</label>
-                            <input type="password" id="key-${index}" placeholder="Your API private key">
+                            <input type="password" id="key-${safeIndex}" placeholder="Your API private key">
                         </div>
                         <div class="form-group">
                             <label>API Key Index</label>
-                            <input type="number" id="keyIndex-${index}" value="0" min="0">
+                            <input type="number" id="keyIndex-${safeIndex}" value="0" min="0">
                         </div>
                     </div>
                 `;
@@ -762,7 +1035,81 @@
             return accounts;
         }
 
-        // Step 2: Fetch trades
+        // Lighter API base URL
+        const LIGHTER_API = 'https://mainnet.zklighter.elliot.ai';
+        const RATE_LIMIT_DELAY = 3500; // 3.5s between trade calls (20/min limit)
+        const FUNDING_RATE_LIMIT_DELAY = 1000; // 1s between funding calls (60/min limit)
+        
+        // Helper to check if extended auth is enabled
+        function isExtendedAuth() {
+            return document.getElementById('extendedAuth')?.checked || false;
+        }
+        
+        // Fetch trades from Lighter API directly (client-side)
+        // Uses headers for auth token (not visible in URL/console)
+        async function fetchTradesFromLighter(authToken, accountIndex) {
+            const allTrades = [];
+            let cursor = null;
+            let page = 0;
+            
+            while (true) {
+                page++;
+                const params = new URLSearchParams({
+                    account_index: accountIndex,
+                    sort_by: 'timestamp',
+                    limit: 100
+                });
+                if (cursor) {
+                    params.append('cursor', cursor);
+                }
+                
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching page ${page}...`, 'loading');
+                
+                try {
+                    const response = await fetch(`${LIGHTER_API}/api/v1/trades?${params}`, {
+                        headers: { 'Authorization': authToken }
+                    });
+                    
+                    if (response.status === 429) {
+                        showStatus('fetchStatus', `Rate limited, waiting 15s...`, 'loading');
+                        await new Promise(r => setTimeout(r, 15000));
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                        console.error(`HTTP error: ${response.status}`);
+                        break;
+                    }
+                    
+                    const data = await response.json();
+                    if (data.code !== 200) {
+                        console.error(`API error: ${data.code}`);
+                        break;
+                    }
+                    
+                    const trades = data.trades || [];
+                    allTrades.push(...trades);
+                    
+                    // Check for next page
+                    if (!data.next_cursor || trades.length === 0) {
+                        break;
+                    }
+                    
+                    cursor = data.next_cursor;
+                    
+                    // Rate limit delay
+                    await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
+                    
+                } catch (error) {
+                    console.error(`Error fetching trades: ${error}`);
+                    break;
+                }
+            }
+            
+            return allTrades;
+        }
+
+        // Step 2: Fetch trades (hybrid approach)
         async function fetchTrades() {
             let accounts;
             try {
@@ -777,24 +1124,81 @@
                 return;
             }
 
-            const btn = document.getElementById('fetchBtn');
+            const btn = document.getElementById('fetchTradesBtn');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
-            showStatus('fetchStatus', `Fetching trades for ${accounts.length} account(s)... This may take a while.`, 'loading');
-
+            
             try {
-                const response = await fetch('/api/fetch-trades', {
+                // Step 1: Get auth tokens from our server
+                const extendedAuth = isExtendedAuth();
+                showStatus('fetchStatus', `Generating auth tokens${extendedAuth ? ' (60 min)' : ''}...`, 'loading');
+                const authResponse = await fetch('/api/generate-auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ accounts })
+                    body: JSON.stringify({ accounts, extended_auth: extendedAuth })
                 });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Failed to fetch trades');
+                
+                const authData = await authResponse.json();
+                if (!authResponse.ok) {
+                    throw new Error(authData.detail || 'Failed to generate auth tokens');
                 }
-
-                fetchedData = data.accounts;
+                
+                // Step 2: Fetch trades directly from Lighter API (client-side)
+                fetchedData = {};
+                rawTradesData = {};
+                
+                for (const account of accounts) {
+                    const accountIndex = account.account_index;
+                    const authInfo = authData.accounts[accountIndex];
+                    
+                    if (!authInfo || !authInfo.success) {
+                        fetchedData[accountIndex] = {
+                            success: false,
+                            error: authInfo?.error || 'Auth token generation failed',
+                            total_trades: 0,
+                            trades: []
+                        };
+                        continue;
+                    }
+                    
+                    // Cache auth token for funding fetch later
+                    authTokens[accountIndex] = authInfo.auth_token;
+                    
+                    // Fetch raw trades from Lighter
+                    const rawTrades = await fetchTradesFromLighter(authInfo.auth_token, accountIndex);
+                    
+                    // Store raw trades for JSON export
+                    rawTradesData[accountIndex] = rawTrades;
+                    
+                    // Step 3: Process trades through our server (adds market names, PnL, etc.)
+                    showStatus('fetchStatus', `Processing ${rawTrades.length} trades for account #${accountIndex}...`, 'loading');
+                    
+                    const processResponse = await fetch('/api/process-trades', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            account_index: accountIndex,
+                            trades: rawTrades
+                        })
+                    });
+                    
+                    const processedData = await processResponse.json();
+                    
+                    if (processResponse.ok && processedData.success) {
+                        fetchedData[accountIndex] = {
+                            success: true,
+                            total_trades: processedData.total_trades,
+                            trades: processedData.trades
+                        };
+                    } else {
+                        fetchedData[accountIndex] = {
+                            success: false,
+                            error: processedData.detail || 'Processing failed',
+                            total_trades: 0,
+                            trades: []
+                        };
+                    }
+                }
                 
                 // Count total trades
                 let totalTrades = 0;
@@ -845,16 +1249,23 @@
                 content.id = `content-${accountIndex}`;
 
                 if (!accountData.success) {
-                    content.innerHTML = `<div class="error-message">Error: ${accountData.error}</div>`;
+                    content.innerHTML = `<div class="error-message">Error: ${escapeHtml(accountData.error)}</div>`;
                 } else if (accountData.trades.length === 0) {
                     content.innerHTML = `<div class="error-message">No trades found for this account</div>`;
                 } else {
+                    const safeAccountIndex = parseInt(accountIndex, 10);
+                    const safeTotal = parseInt(accountData.total_trades, 10) || 0;
                     content.innerHTML = `
                         <div class="results-header">
-                            <span class="results-stats">${accountData.total_trades} trades</span>
-                            <button class="btn-secondary btn-small" onclick="exportCSV(${accountIndex})">
-                                Export CSV
-                            </button>
+                            <span class="results-stats">${safeTotal} trades</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-secondary btn-small" onclick="exportCSV(${safeAccountIndex})">
+                                    CSV
+                                </button>
+                                <button class="btn-secondary btn-small" onclick="exportJSON(${safeAccountIndex})">
+                                    JSON
+                                </button>
+                            </div>
                         </div>
                         <div class="results-box">
                             ${buildTradesTable(accountData.trades, visibleCols)}
@@ -892,30 +1303,44 @@
             return html;
         }
         
-        // Format cell value based on column type
+        // Format cell value based on column type (with XSS protection)
         function formatCell(trade, col) {
             const value = trade[col];
             
             switch(col) {
                 case 'market':
-                    return `<span class="trade-market">${value}</span>`;
+                    return `<span class="trade-market">${escapeHtml(value)}</span>`;
                 case 'side':
-                    const sideClass = value.toLowerCase().includes('long') ? 'long' : 'short';
-                    return `<span class="trade-side ${sideClass}">${value}</span>`;
+                    const safeValue = escapeHtml(value);
+                    // Green for buy actions: Open Long, Increase Long, Close Short, Reduce Short, Short > Long
+                    // Red for sell actions: Open Short, Increase Short, Close Long, Reduce Long, Long > Short
+                    const isBuyAction = ['Open Long', 'Increase Long', 'Close Short', 'Reduce Short', 'Short > Long'].includes(value);
+                    const sideClass = isBuyAction ? 'long' : 'short';
+                    return `<span class="trade-side ${sideClass}">${safeValue}</span>`;
                 case 'trade_value_usd':
                 case 'price_usd':
-                    return `$${value.toFixed(2)}`;
+                    const numVal = parseFloat(value) || 0;
+                    return `$${numVal.toFixed(2)}`;
                 case 'fee_usd':
-                    return `$${value.toFixed(4)}`;
+                    const feeVal = parseFloat(value) || 0;
+                    return `$${feeVal.toFixed(4)}`;
                 case 'pnl_usd':
                     if (value === null) return '-';
-                    const pnlClass = value >= 0 ? 'profit' : 'loss';
-                    const sign = value >= 0 ? '+' : '';
-                    return `<span class="trade-pnl ${pnlClass}">${sign}$${value.toFixed(2)}</span>`;
+                    const pnlVal = parseFloat(value) || 0;
+                    const pnlClass = pnlVal >= 0 ? 'profit' : 'loss';
+                    const sign = pnlVal >= 0 ? '+' : '';
+                    return `<span class="trade-pnl ${pnlClass}">${sign}$${pnlVal.toFixed(2)}</span>`;
                 case 'tx_hash':
-                    return `<span class="tx-hash" title="${value}">${value.substring(0, 16)}...</span>`;
+                    const safeHash = escapeHtml(value);
+                    const shortHash = String(value).substring(0, 16);
+                    return `<span class="tx-hash" title="${safeHash}">${escapeHtml(shortHash)}...</span>`;
+                case 'trade_id':
+                    return escapeHtml(parseInt(value, 10) || value);
+                case 'size':
+                    const sizeVal = parseFloat(value) || 0;
+                    return sizeVal.toString();
                 default:
-                    return value;
+                    return escapeHtml(value);
             }
         }
 
@@ -981,6 +1406,388 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+        }
+        
+        // Export JSON for a specific account (raw data)
+        function exportJSON(accountIndex) {
+            const rawTrades = rawTradesData[accountIndex];
+            if (!rawTrades || rawTrades.length === 0) {
+                alert('No trades to export for this account');
+                return;
+            }
+            
+            const jsonContent = JSON.stringify({
+                exported_at: new Date().toISOString(),
+                account_index: accountIndex,
+                total_trades: rawTrades.length,
+                trades: rawTrades
+            }, null, 2);
+            
+            // Generate filename
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_trades_account_${accountIndex}_${timestamp}.json`;
+            
+            // Download
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+        }
+        
+        // ===== FUNDING PAYMENTS =====
+        
+        // Fetch funding from Lighter API
+        async function fetchFundingFromLighter(authToken, accountIndex) {
+            const allFundings = [];
+            let cursor = null;
+            let page = 0;
+            
+            while (true) {
+                page++;
+                const params = new URLSearchParams({
+                    account_index: accountIndex,
+                    limit: 100
+                });
+                if (cursor) {
+                    params.append('cursor', cursor);
+                }
+                
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching funding page ${page}...`, 'loading');
+                
+                try {
+                    const response = await fetch(`${LIGHTER_API}/api/v1/positionFunding?${params}`, {
+                        headers: { 'Authorization': authToken }
+                    });
+                    
+                    if (response.status === 429) {
+                        showStatus('fundingStatus', `Rate limited, waiting 15s...`, 'loading');
+                        await new Promise(r => setTimeout(r, 15000));
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                        console.error(`HTTP error: ${response.status}`);
+                        break;
+                    }
+                    
+                    const data = await response.json();
+                    if (data.code !== 200) {
+                        console.error(`API error: ${data.code}`);
+                        break;
+                    }
+                    
+                    const fundings = data.position_fundings || [];
+                    allFundings.push(...fundings);
+                    
+                    if (!data.next_cursor || fundings.length === 0) {
+                        break;
+                    }
+                    
+                    cursor = data.next_cursor;
+                    await new Promise(r => setTimeout(r, FUNDING_RATE_LIMIT_DELAY));
+                    
+                } catch (error) {
+                    console.error(`Error fetching funding: ${error}`);
+                    break;
+                }
+            }
+            
+            return allFundings;
+        }
+        
+        // Fetch funding for all accounts
+        async function fetchFunding() {
+            let accounts;
+            try {
+                accounts = getSelectedAccounts();
+            } catch (error) {
+                showStatus('fetchStatus', error.message, 'error');
+                return;
+            }
+
+            if (accounts.length === 0) {
+                showStatus('fetchStatus', 'Please select at least one account', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('fetchFundingBtn');
+            const tradesBtn = document.getElementById('fetchTradesBtn');
+            btn.disabled = true;
+            tradesBtn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Fetching...';
+            
+            try {
+                // Generate auth tokens if we don't have them
+                const needsAuth = accounts.some(a => !authTokens[a.account_index]);
+                
+                if (needsAuth) {
+                    const extendedAuth = isExtendedAuth();
+                    showStatus('fetchStatus', `Generating auth tokens${extendedAuth ? ' (60 min)' : ''}...`, 'loading');
+                    const authResponse = await fetch('/api/generate-auth', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accounts, extended_auth: extendedAuth })
+                    });
+                    
+                    const authData = await authResponse.json();
+                    if (!authResponse.ok) {
+                        throw new Error(authData.detail || 'Failed to generate auth tokens');
+                    }
+                    
+                    // Cache auth tokens
+                    for (const account of accounts) {
+                        const authInfo = authData.accounts[account.account_index];
+                        if (authInfo && authInfo.success) {
+                            authTokens[account.account_index] = authInfo.auth_token;
+                        }
+                    }
+                }
+                
+                fundingData = {};
+                rawFundingData = {};
+                
+                for (const account of accounts) {
+                    const accountIndex = account.account_index;
+                    const authToken = authTokens[accountIndex];
+                    
+                    if (!authToken) {
+                        fundingData[accountIndex] = {
+                            success: false,
+                            error: 'Auth token not available',
+                            total_fundings: 0,
+                            fundings: []
+                        };
+                        continue;
+                    }
+                    
+                    const rawFundings = await fetchFundingFromLighter(authToken, accountIndex);
+                    rawFundingData[accountIndex] = rawFundings;
+                    
+                    // Process funding data
+                    const processed = await processFundingData(rawFundings, accountIndex);
+                    fundingData[accountIndex] = {
+                        success: true,
+                        total_fundings: processed.length,
+                        fundings: processed
+                    };
+                }
+                
+                let totalFundings = 0;
+                Object.values(fundingData).forEach(acc => {
+                    totalFundings += acc.total_fundings || 0;
+                });
+                
+                showStatus('fetchStatus', `Successfully fetched ${totalFundings} funding payments`, 'success');
+                displayFundingResults();
+                document.getElementById('fundingCard').classList.remove('hidden');
+                
+            } catch (error) {
+                showStatus('fetchStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                tradesBtn.disabled = false;
+                btn.textContent = 'Fetch Funding';
+            }
+        }
+        
+        // Process funding data (add market names, format values)
+        async function processFundingData(rawFundings, accountIndex) {
+            // Get market map from server
+            const response = await fetch('/api/markets');
+            const marketData = await response.json();
+            const marketMap = marketData.markets || {};
+            
+            return rawFundings.map(f => {
+                const marketName = marketMap[f.market_id] || `ID:${f.market_id}`;
+                const timestamp = f.timestamp * 1000; // Convert to ms
+                const dt = new Date(timestamp);
+                const dateStr = dt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+                
+                return {
+                    funding_id: f.funding_id,
+                    market: marketName,
+                    datetime_utc: dateStr,
+                    change_usd: parseFloat(f.change),
+                    rate_percent: (parseFloat(f.rate) * 100).toFixed(4),
+                    size: parseFloat(f.position_size),
+                    side: f.position_side
+                };
+            });
+        }
+        
+        // Display funding results
+        function displayFundingResults() {
+            const tabsContainer = document.getElementById('fundingTabs');
+            const contentsContainer = document.getElementById('fundingContents');
+            tabsContainer.innerHTML = '';
+            contentsContainer.innerHTML = '';
+            
+            const accountIds = Object.keys(fundingData);
+            
+            accountIds.forEach((accountIndex, i) => {
+                const accountData = fundingData[accountIndex];
+                const isFirst = i === 0;
+                
+                // Create tab
+                const tab = document.createElement('div');
+                tab.className = `tab ${isFirst ? 'active' : ''}`;
+                tab.textContent = `Account #${accountIndex}`;
+                tab.onclick = () => switchFundingTab(accountIndex);
+                tab.id = `funding-tab-${accountIndex}`;
+                tabsContainer.appendChild(tab);
+                
+                // Create content
+                const content = document.createElement('div');
+                content.className = `tab-content ${isFirst ? 'active' : ''}`;
+                content.id = `funding-content-${accountIndex}`;
+                
+                if (!accountData.success || accountData.fundings.length === 0) {
+                    content.innerHTML = `<div class="error-message">No funding payments found</div>`;
+                } else {
+                    const safeAccountIndex = parseInt(accountIndex, 10);
+                    const safeTotal = parseInt(accountData.total_fundings, 10) || 0;
+                    content.innerHTML = `
+                        <div class="results-header">
+                            <span class="results-stats">${safeTotal} funding payments</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-secondary btn-small" onclick="exportFundingCSV(${safeAccountIndex})">
+                                    CSV
+                                </button>
+                                <button class="btn-secondary btn-small" onclick="exportFundingJSON(${safeAccountIndex})">
+                                    JSON
+                                </button>
+                            </div>
+                        </div>
+                        <div class="results-box">
+                            ${buildFundingTable(accountData.fundings)}
+                        </div>
+                    `;
+                }
+                
+                contentsContainer.appendChild(content);
+            });
+        }
+        
+        // Build funding table (with XSS protection)
+        function buildFundingTable(fundings) {
+            let html = '<table class="trades-table"><thead><tr>';
+            html += '<th>Market</th><th>Date/Time</th><th>Change ($)</th><th>Rate (%)</th><th>Size</th><th>Side</th>';
+            html += '</tr></thead><tbody>';
+            
+            fundings.forEach(f => {
+                const changeVal = parseFloat(f.change_usd) || 0;
+                const changeClass = changeVal >= 0 ? 'profit' : 'loss';
+                const changeSign = changeVal >= 0 ? '+' : '';
+                const safeSide = String(f.side || '').toLowerCase();
+                const sideClass = safeSide === 'long' ? 'long' : 'short';
+                const sizeVal = parseFloat(f.size) || 0;
+                const rateVal = escapeHtml(f.rate_percent);
+                
+                html += `<tr>
+                    <td><span class="trade-market">${escapeHtml(f.market)}</span></td>
+                    <td>${escapeHtml(f.datetime_utc)}</td>
+                    <td><span class="trade-pnl ${changeClass}">${changeSign}$${changeVal.toFixed(6)}</span></td>
+                    <td>${rateVal}%</td>
+                    <td>${sizeVal}</td>
+                    <td><span class="trade-side ${sideClass}">${escapeHtml(f.side)}</span></td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        // Switch funding tab
+        function switchFundingTab(accountIndex) {
+            document.querySelectorAll('#fundingTabs .tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`funding-tab-${accountIndex}`).classList.add('active');
+            
+            document.querySelectorAll('#fundingContents .tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`funding-content-${accountIndex}`).classList.add('active');
+        }
+        
+        // Export funding as CSV
+        function exportFundingCSV(accountIndex) {
+            const data = fundingData[accountIndex];
+            if (!data || !data.fundings || data.fundings.length === 0) {
+                alert('No funding to export');
+                return;
+            }
+            
+            const headers = ['Market', 'Date/Time', 'Change ($)', 'Rate (%)', 'Size', 'Side'];
+            const csvRows = [headers.join(',')];
+            
+            data.fundings.forEach(f => {
+                csvRows.push([
+                    `"${f.market}"`,
+                    `"${f.datetime_utc}"`,
+                    f.change_usd,
+                    f.rate_percent,
+                    f.size,
+                    `"${f.side}"`
+                ].join(','));
+            });
+            
+            const csvContent = csvRows.join('\n');
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_funding_account_${accountIndex}_${timestamp}.csv`;
+            
+            const BOM = '\uFEFF';
+            const encodedContent = encodeURIComponent(BOM + csvContent);
+            const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+            
+            const a = document.createElement('a');
+            a.href = dataUri;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+        
+        // Export funding as JSON
+        function exportFundingJSON(accountIndex) {
+            const rawFundings = rawFundingData[accountIndex];
+            if (!rawFundings || rawFundings.length === 0) {
+                alert('No funding to export');
+                return;
+            }
+            
+            const jsonContent = JSON.stringify({
+                exported_at: new Date().toISOString(),
+                account_index: parseInt(accountIndex),
+                total_fundings: rawFundings.length,
+                position_fundings: rawFundings
+            }, null, 2);
+            
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_funding_account_${accountIndex}_${timestamp}.json`;
+            
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
         }
         
         // Initialize on page load

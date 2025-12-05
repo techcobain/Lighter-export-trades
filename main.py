@@ -1,55 +1,118 @@
 """
-Lighter Trades Fetcher - A minimal web app to fetch and display trades from Lighter exchange.
-Backend API using FastAPI with the Lighter SDK for authentication.
+Lighter Trades Fetcher - Fetch and export trading history from Lighter exchange.
 """
 
 import asyncio
 import time
-import csv
-import io
 from datetime import datetime, timezone
 from typing import Optional
+from collections import defaultdict
 import httpx
 import lighter
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 
-# ===== CONFIGURATION =====
+# Configuration
 BASE_URL = "https://mainnet.zklighter.elliot.ai"
 TRADES_LIMIT = 100
-RATE_LIMIT_DELAY = 3.5  # seconds between calls (20 calls/min = 3 sec, we use 3.5 for safety)
-RATE_LIMIT_RETRY_DELAY = 15  # seconds to wait if rate limited
+RATE_LIMIT_DELAY = 3.5
+RATE_LIMIT_RETRY_DELAY = 15
 
-# ===== APP INITIALIZATION =====
+ENDPOINT_RATE_LIMITS = {
+    "/api/generate-auth": {"requests": 10, "window": 60},
+    "/api/lookup-accounts": {"requests": 20, "window": 60},
+    "/api/process-trades": {"requests": 30, "window": 60},
+}
+
+
+# Security Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "connect-src 'self' https://mainnet.zklighter.elliot.ai; "
+            "img-src 'self' data:; "
+            "frame-ancestors 'none';"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app):
+        super().__init__(app)
+        self.requests = defaultdict(lambda: defaultdict(list))
+    
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path not in ENDPOINT_RATE_LIMITS:
+            return await call_next(request)
+        
+        client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        if not client_ip:
+            client_ip = request.client.host if request.client else "unknown"
+        
+        limit_config = ENDPOINT_RATE_LIMITS[path]
+        current_time = time.time()
+        
+        self.requests[client_ip][path] = [
+            t for t in self.requests[client_ip][path]
+            if current_time - t < limit_config["window"]
+        ]
+        
+        if len(self.requests[client_ip][path]) >= limit_config["requests"]:
+            return Response(
+                content='{"detail": "Rate limit exceeded"}',
+                status_code=429,
+                media_type="application/json"
+            )
+        
+        self.requests[client_ip][path].append(current_time)
+        return await call_next(request)
+
+
+# App Setup
 app = FastAPI(title="Lighter Trades Fetcher")
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
-# Cache for market details (refreshed hourly)
 market_cache = {"data": {}, "last_updated": 0}
-MARKET_CACHE_TTL = 3600  # 1 hour in seconds
+MARKET_CACHE_TTL = 3600
 
 
-# ===== MODELS =====
+# Models
 class AccountCredentials(BaseModel):
-    """Credentials for a single account."""
     account_index: int
     private_key: str
     api_key_index: int
 
 
 class LookupAccountsRequest(BaseModel):
-    """Request model for looking up accounts."""
     l1_address: str
 
 
-class FetchTradesRequest(BaseModel):
-    """Request model for fetching trades from multiple accounts."""
+class GenerateAuthRequest(BaseModel):
     accounts: list[AccountCredentials]
+    extended_auth: bool = False
+
+
+class ProcessTradesRequest(BaseModel):
+    account_index: int
+    trades: list[dict]
 
 
 class TradeData(BaseModel):
-    """Processed trade data for display."""
     trade_id: int
     tx_hash: str
     market: str
@@ -64,16 +127,10 @@ class TradeData(BaseModel):
     pnl_usd: Optional[float] = None
 
 
-# ===== HELPER FUNCTIONS =====
-
+# Helper Functions
 async def fetch_market_details() -> dict:
-    """
-    Fetch and cache market details (symbol to market_id mapping).
-    Refreshes cache if older than 1 hour.
-    """
+    """Fetch and cache market details (market_id -> symbol mapping)."""
     current_time = time.time()
-    
-    # Return cached data if still valid
     if market_cache["data"] and (current_time - market_cache["last_updated"]) < MARKET_CACHE_TTL:
         return market_cache["data"]
     
@@ -81,380 +138,221 @@ async def fetch_market_details() -> dict:
         response = await client.get(f"{BASE_URL}/api/v1/orderBookDetails")
         if response.status_code == 200:
             data = response.json()
-            # Build mapping: market_id -> symbol
-            market_map = {}
-            for book in data.get("order_book_details", []):
-                market_map[book["market_id"]] = book["symbol"]
-            
+            market_map = {book["market_id"]: book["symbol"] for book in data.get("order_book_details", [])}
             market_cache["data"] = market_map
             market_cache["last_updated"] = current_time
             return market_map
-    
-    return market_cache["data"]  # Return stale cache on error
+    return market_cache["data"]
 
 
 async def get_account_indexes(l1_address: str) -> list[int]:
-    """
-    Fetch account indexes for a given L1 address.
-    """
+    """Fetch account indexes for a given L1 address."""
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{BASE_URL}/api/v1/accountsByL1Address",
-            params={"l1_address": l1_address}
-        )
+        response = await client.get(f"{BASE_URL}/api/v1/accountsByL1Address", params={"l1_address": l1_address})
         if response.status_code != 200:
             raise HTTPException(status_code=400, detail="Failed to fetch account info")
-        
         data = response.json()
         if data.get("code") != 200:
             raise HTTPException(status_code=400, detail="Invalid address or API error")
-        
-        sub_accounts = data.get("sub_accounts", [])
-        return [acc["index"] for acc in sub_accounts]
+        return [acc["index"] for acc in data.get("sub_accounts", [])]
 
 
-async def create_auth_token(private_key: str, account_index: int, api_key_index: int) -> str:
-    """
-    Generate authentication token using the Lighter SDK.
-    Uses api_private_keys dict format: {api_key_index: private_key}
-    """
+async def create_auth_token(private_key: str, account_index: int, api_key_index: int, deadline: int = -1) -> str:
+    """Generate auth token using Lighter SDK."""
     client = None
     try:
-        # SDK expects api_private_keys as a dict mapping api_key_index -> private_key
         client = lighter.SignerClient(
             url=BASE_URL,
             account_index=account_index,
             api_private_keys={api_key_index: private_key},
         )
-        
         err = client.check_client()
-        if err is not None:
-            raise HTTPException(status_code=400, detail=f"Client verification failed: {err}")
+        if err:
+            raise HTTPException(status_code=400, detail="Client verification failed")
         
-        # Create auth token (default 10 min expiry)
-        auth_token, err = client.create_auth_token_with_expiry(
-            api_key_index=api_key_index
-        )
-        
-        if err is not None:
-            raise HTTPException(status_code=400, detail=f"Auth token creation failed: {err}")
-        
+        auth_token, err = client.create_auth_token_with_expiry(deadline=deadline, api_key_index=api_key_index)
+        if err:
+            raise HTTPException(status_code=400, detail="Auth token creation failed")
         return auth_token
-        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Authentication error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
     finally:
         if client:
-            await client.close()
+            try:
+                await client.close()
+            except:
+                pass
 
 
 def is_user_taker(trade: dict, account_index: int) -> bool:
-    """
-    Determine if the user (account_index) is the taker in this trade.
-    - is_maker_ask=True: Maker placed an ask (selling), so taker is buyer (bid_account_id)
-    - is_maker_ask=False: Maker placed a bid (buying), so taker is seller (ask_account_id)
-    """
-    is_maker_ask = trade.get("is_maker_ask", False)
-    bid_account_id = trade.get("bid_account_id")
-    ask_account_id = trade.get("ask_account_id")
-    
-    if is_maker_ask:
-        # Maker is selling, taker is buying
-        return bid_account_id == account_index
-    else:
-        # Maker is buying, taker is selling
-        return ask_account_id == account_index
+    """Determine if user is taker in this trade."""
+    if trade.get("is_maker_ask", False):
+        return trade.get("bid_account_id") == account_index
+    return trade.get("ask_account_id") == account_index
 
 
 def determine_side(trade: dict, account_index: int) -> str:
-    """
-    Determine the trade side based on trade data.
-    
-    We can only reliably detect closes when position_sign_changed is true.
-    Otherwise, we label by direction (Buy/Sell) since we can't know if
-    it's opening or closing without knowing prior position direction.
-    """
+    """Determine trade side based on position state."""
     is_taker = is_user_taker(trade, account_index)
     is_buyer = trade.get("bid_account_id") == account_index
+    trade_size = float(trade.get("size", 0))
     
-    # Get position sign change flag (only available for takers)
     if is_taker:
-        position_sign_changed = trade.get("taker_position_sign_changed", False)
-    else:
-        position_sign_changed = False
-    
-    # If position sign changed, we know it's a close (and possibly flip)
-    if position_sign_changed:
-        if is_buyer:
-            return "Close Short"
-        else:
-            return "Close Long"
-    
-    # Without position sign change, we can only say the direction
-    # "Long" means buying, "Short" means selling
-    if is_buyer:
-        return "Long"  # Could be Open Long or Add to Long
-    else:
-        return "Short"  # Could be Open Short or Close Long - we can't tell
-
-
-def calculate_fee_usd(trade: dict, account_index: int, price: float, size: float) -> float:
-    """
-    Calculate fee in USD. Fee values are in basis points (1 bp = 0.0001).
-    """
-    is_taker = is_user_taker(trade, account_index)
-    fee_bp = trade.get("taker_fee", 0) if is_taker else trade.get("maker_fee", 0)
-    fee_rate = fee_bp / 1_000_000  # Convert from micro basis points
-    return price * size * fee_rate
-
-
-def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeData:
-    """
-    Process a raw trade into display-ready format.
-    """
-    market_id = trade.get("market_id", 0)
-    market_name = market_map.get(market_id, f"ID:{market_id}")
-    
-    size = float(trade.get("size", 0))
-    price = float(trade.get("price", 0))
-    trade_value = float(trade.get("usd_amount", 0))
-    
-    # Determine role using helper function
-    is_taker = is_user_taker(trade, account_index)
-    role = "Taker" if is_taker else "Maker"
-    
-    # Calculate fee
-    fee_usd = calculate_fee_usd(trade, account_index, price, size)
-    
-    # Timestamp to UTC datetime
-    timestamp_ms = trade.get("timestamp", 0)
-    dt_utc = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
-    datetime_str = dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-    
-    # Determine side
-    side = determine_side(trade, account_index)
-    
-    # Calculate PnL for closing trades
-    # Only calculate when we have confirmed close (position_sign_changed)
-    pnl = None
-    is_buyer = trade.get("bid_account_id") == account_index
-    
-    # Get the user's position data before this trade
-    if is_taker:
-        entry_quote = float(trade.get("taker_entry_quote_before", 0) or 0)
         position_before = float(trade.get("taker_position_size_before", 0) or 0)
         position_sign_changed = trade.get("taker_position_sign_changed", False)
     else:
+        position_before = float(trade.get("maker_position_size_before", 0) or 0)
+        position_sign_changed = trade.get("maker_position_sign_changed", False)
+    
+    was_long = position_before > 0
+    was_short = position_before < 0
+    had_position = abs(position_before) > 0
+    
+    # Full close or flip
+    if position_sign_changed and had_position:
+        is_flip = trade_size > abs(position_before)
+        if is_buyer:
+            return "Short > Long" if is_flip else "Close Short"
+        return "Long > Short" if is_flip else "Close Long"
+    
+    # Had position: reducing or adding
+    if had_position:
+        is_reducing = (was_long and not is_buyer) or (was_short and is_buyer)
+        if is_reducing:
+            return "Reduce Long" if was_long else "Reduce Short"
+        return "Increase Long" if is_buyer else "Increase Short"
+    
+    # Opening new position
+    return "Open Long" if is_buyer else "Open Short"
+
+
+def calculate_fee_usd(trade: dict, account_index: int, price: float, size: float) -> float:
+    """Calculate fee in USD."""
+    is_taker = is_user_taker(trade, account_index)
+    fee_bp = trade.get("taker_fee", 0) if is_taker else trade.get("maker_fee", 0)
+    return price * size * (fee_bp / 1_000_000)
+
+
+def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeData:
+    """Process raw trade into display format."""
+    market_id = trade.get("market_id", 0)
+    size = float(trade.get("size", 0))
+    price = float(trade.get("price", 0))
+    
+    is_taker = is_user_taker(trade, account_index)
+    is_buyer = trade.get("bid_account_id") == account_index
+    
+    if is_taker:
+        entry_quote = float(trade.get("taker_entry_quote_before", 0) or 0)
+        position_before = float(trade.get("taker_position_size_before", 0) or 0)
+    else:
         entry_quote = float(trade.get("maker_entry_quote_before", 0) or 0)
         position_before = float(trade.get("maker_position_size_before", 0) or 0)
-        position_sign_changed = False
     
-    # Calculate PnL only for confirmed closes (position_sign_changed)
-    if position_sign_changed and position_before > 0 and entry_quote > 0:
-        entry_price = entry_quote / position_before
-        
-        if is_buyer:
-            # Buying to close = was short, profit if entry > exit (price dropped)
-            pnl = (entry_price - price) * min(size, position_before)
+    was_long = position_before > 0
+    was_short = position_before < 0
+    is_reducing = (was_long and not is_buyer) or (was_short and is_buyer)
+    
+    # Calculate PnL for reducing trades
+    pnl = None
+    if is_reducing and abs(position_before) > 0 and abs(entry_quote) > 0:
+        entry_price = abs(entry_quote) / abs(position_before)
+        closed_size = min(size, abs(position_before))
+        if was_long:
+            pnl = (price - entry_price) * closed_size
         else:
-            # Selling to close = was long, profit if exit > entry (price rose)
-            pnl = (price - entry_price) * min(size, position_before)
+            pnl = (entry_price - price) * closed_size
+    
+    timestamp_ms = trade.get("timestamp", 0)
+    dt_utc = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
     
     return TradeData(
         trade_id=trade.get("trade_id", 0),
         tx_hash=trade.get("tx_hash", ""),
-        market=market_name,
-        side=side,
-        datetime_utc=datetime_str,
-        trade_value_usd=round(trade_value, 2),
+        market=market_map.get(market_id, f"ID:{market_id}"),
+        side=determine_side(trade, account_index),
+        datetime_utc=dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        trade_value_usd=round(float(trade.get("usd_amount", 0)), 2),
         size=size,
         price_usd=round(price, 6),
-        fee_usd=round(fee_usd, 6),
-        role=role,
+        fee_usd=round(calculate_fee_usd(trade, account_index, price, size), 6),
+        role="Taker" if is_taker else "Maker",
         trade_type=trade.get("type", "trade"),
         pnl_usd=round(pnl, 4) if pnl is not None else None
     )
 
 
-async def fetch_trades_for_account(
-    auth_token: str,
-    account_index: int,
-    market_map: dict
-) -> list[TradeData]:
-    """
-    Fetch all trades for a specific account, handling pagination and rate limits.
-    """
-    all_trades = []
-    cursor = None
-    page = 0
-    
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        while True:
-            page += 1
-            # Build request params
-            params = {
-                "account_index": account_index,
-                "sort_by": "timestamp",
-                "limit": TRADES_LIMIT,
-                "auth": auth_token
-            }
-            if cursor:
-                params["cursor"] = cursor
-            
-            # Make request with rate limit handling
-            try:
-                print(f"[Page {page}] Fetching trades... (cursor: {cursor[:20] if cursor else 'None'}...)")
-                response = await client.get(f"{BASE_URL}/api/v1/trades", params=params)
-                
-                if response.status_code == 429:  # Rate limited
-                    print(f"[Page {page}] Rate limited, waiting {RATE_LIMIT_RETRY_DELAY}s...")
-                    await asyncio.sleep(RATE_LIMIT_RETRY_DELAY)
-                    continue
-                
-                if response.status_code != 200:
-                    print(f"[Page {page}] HTTP error: {response.status_code} - {response.text[:200]}")
-                    break
-                
-                data = response.json()
-                if data.get("code") != 200:
-                    print(f"[Page {page}] API error: code={data.get('code')}")
-                    break
-                
-                trades = data.get("trades", [])
-                print(f"[Page {page}] Got {len(trades)} trades")
-                
-                for trade in trades:
-                    processed = process_trade(trade, account_index, market_map)
-                    all_trades.append(processed)
-                
-                # Check for next page
-                next_cursor = data.get("next_cursor")
-                if not next_cursor:
-                    print(f"[Page {page}] No more pages (no next_cursor)")
-                    break
-                if not trades:
-                    print(f"[Page {page}] No more pages (empty trades)")
-                    break
-                
-                cursor = next_cursor
-                
-                # Rate limit delay
-                print(f"[Page {page}] Waiting {RATE_LIMIT_DELAY}s before next request...")
-                await asyncio.sleep(RATE_LIMIT_DELAY)
-                
-            except Exception as e:
-                print(f"[Page {page}] Exception: {e}")
-                break
-    
-    print(f"Total trades fetched: {len(all_trades)}")
-    return all_trades
-
-
-# ===== API ENDPOINTS =====
-
+# API Endpoints
 @app.post("/api/lookup-accounts")
 async def lookup_accounts(request: LookupAccountsRequest):
-    """
-    Lookup all account indexes for an L1 address.
-    Returns list of account indexes that user can select from.
-    """
+    """Lookup account indexes for an L1 address."""
     account_indexes = await get_account_indexes(request.l1_address)
     if not account_indexes:
         raise HTTPException(status_code=400, detail="No accounts found for this address")
-    
-    return {
-        "success": True,
-        "l1_address": request.l1_address,
-        "account_indexes": account_indexes
-    }
+    return {"success": True, "l1_address": request.l1_address, "account_indexes": account_indexes}
 
 
-@app.post("/api/fetch-trades")
-async def fetch_trades(request: FetchTradesRequest):
-    """
-    Fetch trades for multiple accounts.
-    Each account has its own credentials (account_index, private_key, api_key_index).
-    Returns trades grouped by account_index.
-    """
+@app.post("/api/generate-auth")
+async def generate_auth(request: GenerateAuthRequest):
+    """Generate auth tokens for accounts."""
     if not request.accounts:
         raise HTTPException(status_code=400, detail="No accounts provided")
+    if len(request.accounts) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 accounts per request")
     
-    # Fetch market details for name mapping
-    market_map = await fetch_market_details()
-    
-    # Results grouped by account
+    deadline = 3600 if request.extended_auth else -1
     results = {}
     
     for account in request.accounts:
-        account_index = account.account_index
-        print(f"\n=== Fetching trades for account {account_index} ===")
-        
+        if account.account_index < 0:
+            results[account.account_index] = {"success": False, "error": "Invalid account index"}
+            continue
         try:
-            # Generate auth token for this account
             auth_token = await create_auth_token(
-                account.private_key,
-                account_index,
-                account.api_key_index
+                account.private_key, account.account_index, account.api_key_index, deadline
             )
-            
-            # Fetch trades
-            trades = await fetch_trades_for_account(auth_token, account_index, market_map)
-            
-            # Sort by datetime (newest first)
-            trades.sort(key=lambda x: x.datetime_utc, reverse=True)
-            
-            results[account_index] = {
-                "success": True,
-                "total_trades": len(trades),
-                "trades": [t.model_dump() for t in trades]
-            }
-            
+            results[account.account_index] = {"success": True, "auth_token": auth_token}
         except HTTPException as e:
-            print(f"Error with account {account_index}: {e.detail}")
-            results[account_index] = {
-                "success": False,
-                "error": e.detail,
-                "total_trades": 0,
-                "trades": []
-            }
-        except Exception as e:
-            print(f"Error with account {account_index}: {str(e)}")
-            results[account_index] = {
-                "success": False,
-                "error": str(e),
-                "total_trades": 0,
-                "trades": []
-            }
+            results[account.account_index] = {"success": False, "error": e.detail}
+        except Exception:
+            results[account.account_index] = {"success": False, "error": "Authentication failed"}
     
-    return {
-        "success": True,
-        "accounts": results
-    }
+    return {"success": True, "accounts": results}
+
+
+@app.post("/api/process-trades")
+async def process_trades(request: ProcessTradesRequest):
+    """Process raw trades (add market names, PnL, etc)."""
+    market_map = await fetch_market_details()
+    processed = []
+    
+    for trade in request.trades:
+        try:
+            processed.append(process_trade(trade, request.account_index, market_map).model_dump())
+        except:
+            continue
+    
+    processed.sort(key=lambda x: x["datetime_utc"], reverse=True)
+    return {"success": True, "total_trades": len(processed), "trades": processed}
 
 
 @app.get("/api/markets")
 async def get_markets():
-    """
-    Get cached market details (for debugging/info).
-    """
-    market_map = await fetch_market_details()
-    return {"markets": market_map}
+    """Get cached market details."""
+    return {"markets": await fetch_market_details()}
 
 
-# ===== STATIC FILES =====
+# Static Files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/")
 async def root():
-    """Serve the main HTML page."""
     return FileResponse("static/index.html")
 
 
-# ===== RUN =====
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
