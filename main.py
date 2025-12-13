@@ -3,12 +3,14 @@ Lighter Trades Fetcher - Fetch and export trading history from Lighter exchange.
 """
 
 import asyncio
+import re
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from collections import defaultdict
 import httpx
 import lighter
+from eth_utils.address import to_checksum_address
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -128,6 +130,20 @@ class TradeData(BaseModel):
 
 
 # Helper Functions
+def normalize_eth_address(address: str) -> str:
+    """Validate and convert an Ethereum address to checksum format."""
+    address = address.strip()
+    if not address:
+        raise ValueError("Address cannot be empty")
+    if not re.match(r'^0x[0-9a-fA-F]{40}$', address):
+        raise ValueError("Invalid Ethereum address format")
+
+    try:
+        return to_checksum_address(address)
+    except Exception:
+        raise ValueError("Invalid Ethereum address")
+
+
 async def fetch_market_details() -> dict:
     """Fetch and cache market details (market_id -> symbol mapping)."""
     current_time = time.time()
@@ -288,10 +304,15 @@ def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeDat
 @app.post("/api/lookup-accounts")
 async def lookup_accounts(request: LookupAccountsRequest):
     """Lookup account indexes for an L1 address."""
-    account_indexes = await get_account_indexes(request.l1_address)
+    try:
+        checksummed_address = normalize_eth_address(request.l1_address)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    account_indexes = await get_account_indexes(checksummed_address)
     if not account_indexes:
         raise HTTPException(status_code=400, detail="No accounts found for this address")
-    return {"success": True, "l1_address": request.l1_address, "account_indexes": account_indexes}
+    return {"success": True, "l1_address": checksummed_address, "account_indexes": account_indexes}
 
 
 @app.post("/api/generate-auth")
