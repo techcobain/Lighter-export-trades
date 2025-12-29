@@ -654,69 +654,27 @@
                 <div class="faq-items" id="faqItems">
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">
-                            <span>Why do you need my API private keys?</span>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            <div class="faq-answer-content">
-                                To fetch trades and funding payments, we use these two endpoints: 
-                                <a href="https://apidocs.lighter.xyz/reference/trades#/" target="_blank">trades</a> and 
-                                <a href="https://apidocs.lighter.xyz/reference/positionfunding#/" target="_blank">positionFunding</a>. 
-                                They both require authentication, which is a code generated through an API key tied to the account_index you want to get data for. When you're done exporting, you can simply revoke the API key.
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question" onclick="toggleFaq(this)">
-                            <span>Why do I need to add one for each account under the same address?</span>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            <div class="faq-answer-content">
-                                Each account_index, even if under the same address, has its own separate set of API keys. You can have at most 8 sub-accounts, and each sub-account can have at most 255 API keys.
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question" onclick="toggleFaq(this)">
-                            <span>How can I generate API keys?</span>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            <div class="faq-answer-content">
-                                Go to <a href="https://app.lighter.xyz/apikeys" target="_blank">app.lighter.xyz/apikeys</a>. 
-                                Even though no data is stored by this web app, after you are done fetching your trades and funding payments 
-                                you should click on "Revoke" on the same page for the API key you used — this way it won't work anymore.
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question" onclick="toggleFaq(this)">
                             <span>What is a read-only auth token?</span>
                             <span class="faq-toggle">+</span>
                         </div>
                         <div class="faq-answer">
                             <div class="faq-answer-content">
                                 A read-only auth token (starting with "ro:") can only be used to fetch data — it cannot trade or withdraw funds. 
-                                This is the safest option if you just want to export your trading history. Generate one at 
-                                <a href="https://app.lighter.xyz/apikeys" target="_blank">app.lighter.xyz/apikeys</a> by clicking "Generate Read-Only Token".
+                                This is the safest option for exporting your trading history. Generate one at 
+                                <a href="https://app.lighter.xyz/read-only-tokens" target="_blank">app.lighter.xyz/read-only-tokens</a>.
                             </div>
                         </div>
                     </div>
                     
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">
-                            <span>What can you do with my API private key?</span>
+                            <span>Why do I only need one token for all accounts?</span>
                             <span class="faq-toggle">+</span>
                         </div>
                         <div class="faq-answer">
                             <div class="faq-answer-content">
-                                Using an API private key you can trade on the platform, fetch auth-only data, and process withdrawals 
-                                (but only to the same account the Lighter account is tied to, and only via secure withdrawals — 
-                                it is not possible to withdraw to other accounts).
+                                Read-only tokens are scoped to your L1 address, so a single token can access data from all sub-accounts 
+                                associated with that address. This makes it easier to export data from multiple accounts at once. Make sure to click on "Allow Sub-account Access" when you generate the token.
                             </div>
                         </div>
                     </div>
@@ -728,7 +686,7 @@
                         </div>
                         <div class="faq-answer">
                             <div class="faq-answer-content">
-                                To avoid rate limits on the platform, we only fetch ~1.7K trades per minute and ~1.7K funding payments per minute. If you have more, you can use the extended auth option you'll find below to fetch up to 100K trades or 360K funding payments.
+                                To avoid rate limits on the platform, we fetch ~1.7K trades per minute and ~3.6K funding payments per minute. 
                                 You should close the Lighter front-end while using this app or you risk getting rate limited. 
                             </div>
                         </div>
@@ -768,23 +726,36 @@
             <div id="lookupStatus" class="status"></div>
         </div>
 
-        <!-- Step 2: Select Accounts & Enter Credentials -->
+        <!-- Step 2: Enter Read-Only Token -->
         <div class="card hidden" id="step2Card">
-            <div class="card-title">Step 2: Select Accounts & Enter Credentials</div>
+            <div class="card-title">Step 2: Enter Read-Only Token</div>
             <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem;">
-                Select the accounts you want to fetch data from. Each account requires its own API credentials.
+                Enter your read-only auth token. This single token will be used to fetch data from all selected accounts.
+                <br><br>
+                Generate a read-only token at <a href="https://app.lighter.xyz/read-only-tokens" target="_blank" style="color: var(--accent);">app.lighter.xyz/read-only-tokens</a>
+            </p>
+            <div class="form-group">
+                <label for="readOnlyToken">Read-Only Auth Token</label>
+                <input 
+                    type="password" 
+                    id="readOnlyToken" 
+                    placeholder="ro:60973:all:1765479143:90d64052f462..."
+                    required
+                >
+            </div>
+            <button class="btn-primary" id="continueBtn" onclick="continueToAccountSelection()">
+                Continue
+            </button>
+            <div id="tokenStatus" class="status"></div>
+        </div>
+
+        <!-- Step 3: Select Accounts -->
+        <div class="card hidden" id="step3Card">
+            <div class="card-title">Step 3: Select Accounts</div>
+            <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.9rem;">
+                Select the accounts you want to fetch data from.
             </p>
             <div id="accountsList" class="accounts-list"></div>
-            
-            <!-- Extended auth option -->
-            <div style="margin: 20px 0; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
-                    <input type="checkbox" id="extendedAuth" style="width: 18px; height: 18px; accent-color: var(--accent);">
-                    <span style="color: var(--text-secondary); font-size: 0.85rem;">
-                        Extended auth (60 min) — Check if you have more than 15K trades or 15K funding payments
-                    </span>
-                </label>
-            </div>
             
             <div class="btn-group">
                 <button class="btn-primary" id="fetchTradesBtn" onclick="fetchTrades()">
@@ -822,10 +793,9 @@
         </div>
 
         <div class="security-note">
-            <strong>Security Note:</strong> For maximum security, use read-only auth tokens — they can only view data, not trade or withdraw.
-            If using API private keys, they are only used server-side to generate authentication tokens. 
+            <strong>Security Note:</strong> This app uses read-only auth tokens — they can only view data, not trade or withdraw.
             Trade data is fetched directly from your browser to Lighter's API (rate limits apply to your IP). 
-            Keys are never stored or logged.
+            Tokens are never stored or logged.
             This application is <a href="https://github.com/techcobain/Lighter-export-trades" target="_blank" style="color: var(--accent);">open source</a> 
             so you're free to audit the code, and run it locally if you prefer.
         </div>
@@ -863,11 +833,11 @@
         
         // State
         let accountIndexes = [];
+        let readOnlyToken = null; // Single read-only token for all accounts
         let fetchedData = {}; // { accountIndex: { trades: [...], ... } }
         let rawTradesData = {}; // { accountIndex: [raw trades from API] }
         let fundingData = {}; // { accountIndex: { fundings: [...], ... } }
         let rawFundingData = {}; // { accountIndex: [raw funding from API] }
-        let authTokens = {}; // { accountIndex: auth_token } - cached for funding fetch
         
         // All available columns with display names and default visibility
         const ALL_COLUMNS = {
@@ -969,8 +939,7 @@
                 accountIndexes = data.account_indexes;
                 showStatus('lookupStatus', `Found ${accountIndexes.length} account(s)`, 'success');
                 
-                // Build account selection UI
-                buildAccountsList();
+                // Show step 2 (read-only token input)
                 document.getElementById('step2Card').classList.remove('hidden');
 
             } catch (error) {
@@ -981,7 +950,29 @@
             }
         }
 
-        // Build accounts list with checkboxes and credential fields
+        // Continue to account selection after entering read-only token
+        function continueToAccountSelection() {
+            const token = document.getElementById('readOnlyToken').value.trim();
+            if (!token) {
+                showStatus('tokenStatus', 'Please enter a read-only token', 'error');
+                return;
+            }
+            
+            // Validate token format: ro:account_index:scope:expiry:signature
+            if (!token.startsWith('ro:')) {
+                showStatus('tokenStatus', 'Invalid read-only token format. Token must start with "ro:"', 'error');
+                return;
+            }
+            
+            readOnlyToken = token;
+            showStatus('tokenStatus', 'Token validated', 'success');
+            
+            // Build account selection UI
+            buildAccountsList();
+            document.getElementById('step3Card').classList.remove('hidden');
+        }
+
+        // Build accounts list with checkboxes only
         function buildAccountsList() {
             const container = document.getElementById('accountsList');
             container.innerHTML = '';
@@ -1001,56 +992,9 @@
                             onchange="toggleAccount(${safeIndex})">
                         <label for="check-${safeIndex}">Account Index: <strong>${safeIndex}</strong></label>
                     </div>
-                    <div class="account-fields">
-                        <div class="auth-method-selector" style="margin-bottom: 16px;">
-                            <label style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                                <input type="radio" name="authMethod-${safeIndex}" value="apikey" checked 
-                                    onchange="toggleAuthMethod(${safeIndex}, 'apikey')" 
-                                    style="width: 16px; height: 16px; accent-color: var(--accent);">
-                                <span style="text-transform: none; letter-spacing: normal;">API Private Key</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 12px;">
-                                <input type="radio" name="authMethod-${safeIndex}" value="readonly" 
-                                    onchange="toggleAuthMethod(${safeIndex}, 'readonly')" 
-                                    style="width: 16px; height: 16px; accent-color: var(--accent);">
-                                <span style="text-transform: none; letter-spacing: normal;">Read-Only Auth Token</span>
-                            </label>
-                        </div>
-                        <div id="apikey-fields-${safeIndex}" class="apikey-fields">
-                            <div class="form-group">
-                                <label>API Private Key</label>
-                                <input type="password" id="key-${safeIndex}" placeholder="Your API private key">
-                            </div>
-                            <div class="form-group">
-                                <label>API Key Index</label>
-                                <input type="number" id="keyIndex-${safeIndex}" value="0" min="0">
-                            </div>
-                        </div>
-                        <div id="readonly-fields-${safeIndex}" class="readonly-fields" style="display: none;">
-                            <div class="form-group">
-                                <label>Read-Only Auth Token</label>
-                                <input type="password" id="roToken-${safeIndex}" 
-                                    placeholder="ro:60973:all:1765479143:90d64052f462...">
-                            </div>
-                        </div>
-                    </div>
                 `;
                 container.appendChild(div);
             });
-        }
-        
-        // Toggle auth method UI
-        function toggleAuthMethod(index, method) {
-            const apikeyFields = document.getElementById(`apikey-fields-${index}`);
-            const readonlyFields = document.getElementById(`readonly-fields-${index}`);
-            
-            if (method === 'apikey') {
-                apikeyFields.style.display = 'block';
-                readonlyFields.style.display = 'none';
-            } else {
-                apikeyFields.style.display = 'none';
-                readonlyFields.style.display = 'block';
-            }
         }
 
         // Toggle account selection
@@ -1064,50 +1008,16 @@
             }
         }
 
-        // Get selected accounts with credentials
+        // Get selected account indexes
         function getSelectedAccounts() {
-            const accounts = [];
+            const selected = [];
             accountIndexes.forEach(index => {
                 const checkbox = document.getElementById(`check-${index}`);
                 if (checkbox && checkbox.checked) {
-                    // Check which auth method is selected
-                    const authMethodRadio = document.querySelector(`input[name="authMethod-${index}"]:checked`);
-                    const authMethod = authMethodRadio ? authMethodRadio.value : 'apikey';
-                    
-                    if (authMethod === 'readonly') {
-                        // Read-only token
-                        const roToken = document.getElementById(`roToken-${index}`).value.trim();
-                        if (!roToken) {
-                            throw new Error(`Please enter read-only token for account ${index}`);
-                        }
-                        // Validate token format: ro:account_index:scope:expiry:signature
-                        if (!roToken.startsWith('ro:')) {
-                            throw new Error(`Invalid read-only token format for account ${index}`);
-                        }
-                        accounts.push({
-                            account_index: index,
-                            auth_method: 'readonly',
-                            ro_token: roToken
-                        });
-                    } else {
-                        // API Key method
-                        const privateKey = document.getElementById(`key-${index}`).value.trim();
-                        const apiKeyIndex = parseInt(document.getElementById(`keyIndex-${index}`).value) || 0;
-                        
-                        if (!privateKey) {
-                            throw new Error(`Please enter API private key for account ${index}`);
-                        }
-                        
-                        accounts.push({
-                            account_index: index,
-                            auth_method: 'apikey',
-                            private_key: privateKey,
-                            api_key_index: apiKeyIndex
-                        });
-                    }
+                    selected.push(parseInt(index, 10));
                 }
             });
-            return accounts;
+            return selected;
         }
 
         // Lighter API base URL
@@ -1115,10 +1025,6 @@
         const RATE_LIMIT_DELAY = 3500; // 3.5s between trade calls (20/min limit)
         const FUNDING_RATE_LIMIT_DELAY = 1000; // 1s between funding calls (60/min limit)
         
-        // Helper to check if extended auth is enabled
-        function isExtendedAuth() {
-            return document.getElementById('extendedAuth')?.checked || false;
-        }
         
         // Fetch trades from Lighter API directly (client-side)
         // Uses headers for auth token (not visible in URL/console)
@@ -1184,17 +1090,15 @@
             return allTrades;
         }
 
-        // Step 2: Fetch trades (hybrid approach)
+        // Step 3: Fetch trades
         async function fetchTrades() {
-            let accounts;
-            try {
-                accounts = getSelectedAccounts();
-            } catch (error) {
-                showStatus('fetchStatus', error.message, 'error');
+            if (!readOnlyToken) {
+                showStatus('fetchStatus', 'Please enter a read-only token first', 'error');
                 return;
             }
-
-            if (accounts.length === 0) {
+            
+            const selectedAccounts = getSelectedAccounts();
+            if (selectedAccounts.length === 0) {
                 showStatus('fetchStatus', 'Please select at least one account', 'error');
                 return;
             }
@@ -1206,59 +1110,13 @@
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
             
             try {
-                // Separate accounts by auth method
-                const apiKeyAccounts = accounts.filter(a => a.auth_method === 'apikey');
-                const readonlyAccounts = accounts.filter(a => a.auth_method === 'readonly');
-                
-                // Generate auth tokens for API key accounts (if any)
-                if (apiKeyAccounts.length > 0) {
-                    const extendedAuth = isExtendedAuth();
-                    showStatus('fetchStatus', `Generating auth tokens${extendedAuth ? ' (60 min)' : ''}...`, 'loading');
-                    const authResponse = await fetch('/api/generate-auth', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ accounts: apiKeyAccounts, extended_auth: extendedAuth })
-                    });
-                    
-                    const authData = await authResponse.json();
-                    if (!authResponse.ok) {
-                        throw new Error(authData.detail || 'Failed to generate auth tokens');
-                    }
-                    
-                    // Cache auth tokens
-                    for (const account of apiKeyAccounts) {
-                        const authInfo = authData.accounts[account.account_index];
-                        if (authInfo && authInfo.success) {
-                            authTokens[account.account_index] = authInfo.auth_token;
-                        }
-                    }
-                }
-                
-                // Use read-only tokens directly
-                for (const account of readonlyAccounts) {
-                    authTokens[account.account_index] = account.ro_token;
-                }
-                
-                // Fetch trades for all accounts
+                // Fetch trades for all selected accounts using the single read-only token
                 fetchedData = {};
                 rawTradesData = {};
                 
-                for (const account of accounts) {
-                    const accountIndex = account.account_index;
-                    const authToken = authTokens[accountIndex];
-                    
-                    if (!authToken) {
-                        fetchedData[accountIndex] = {
-                            success: false,
-                            error: 'Auth token not available',
-                            total_trades: 0,
-                            trades: []
-                        };
-                        continue;
-                    }
-                    
+                for (const accountIndex of selectedAccounts) {
                     // Fetch raw trades from Lighter
-                    const rawTrades = await fetchTradesFromLighter(authToken, accountIndex);
+                    const rawTrades = await fetchTradesFromLighter(readOnlyToken, accountIndex);
                     
                     // Store raw trades for JSON export
                     rawTradesData[accountIndex] = rawTrades;
@@ -1600,17 +1458,15 @@
             return allFundings;
         }
         
-        // Fetch funding for all accounts
+        // Fetch funding for all selected accounts
         async function fetchFunding() {
-            let accounts;
-            try {
-                accounts = getSelectedAccounts();
-            } catch (error) {
-                showStatus('fetchStatus', error.message, 'error');
+            if (!readOnlyToken) {
+                showStatus('fetchStatus', 'Please enter a read-only token first', 'error');
                 return;
             }
-
-            if (accounts.length === 0) {
+            
+            const selectedAccounts = getSelectedAccounts();
+            if (selectedAccounts.length === 0) {
                 showStatus('fetchStatus', 'Please select at least one account', 'error');
                 return;
             }
@@ -1622,61 +1478,11 @@
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
             
             try {
-                // Separate accounts by auth method - only need to generate for API key accounts without cached token
-                const apiKeyAccountsNeedingAuth = accounts.filter(a => 
-                    a.auth_method === 'apikey' && !authTokens[a.account_index]
-                );
-                const readonlyAccounts = accounts.filter(a => a.auth_method === 'readonly');
-                
-                // Generate auth tokens for API key accounts (if needed)
-                if (apiKeyAccountsNeedingAuth.length > 0) {
-                    const extendedAuth = isExtendedAuth();
-                    showStatus('fetchStatus', `Generating auth tokens${extendedAuth ? ' (60 min)' : ''}...`, 'loading');
-                    const authResponse = await fetch('/api/generate-auth', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ accounts: apiKeyAccountsNeedingAuth, extended_auth: extendedAuth })
-                    });
-                    
-                    const authData = await authResponse.json();
-                    if (!authResponse.ok) {
-                        throw new Error(authData.detail || 'Failed to generate auth tokens');
-                    }
-                    
-                    // Cache auth tokens
-                    for (const account of apiKeyAccountsNeedingAuth) {
-                        const authInfo = authData.accounts[account.account_index];
-                        if (authInfo && authInfo.success) {
-                            authTokens[account.account_index] = authInfo.auth_token;
-                        }
-                    }
-                }
-                
-                // Use read-only tokens directly (if not already cached)
-                for (const account of readonlyAccounts) {
-                    if (!authTokens[account.account_index]) {
-                        authTokens[account.account_index] = account.ro_token;
-                    }
-                }
-                
                 fundingData = {};
                 rawFundingData = {};
                 
-                for (const account of accounts) {
-                    const accountIndex = account.account_index;
-                    const authToken = authTokens[accountIndex];
-                    
-                    if (!authToken) {
-                        fundingData[accountIndex] = {
-                            success: false,
-                            error: 'Auth token not available',
-                            total_fundings: 0,
-                            fundings: []
-                        };
-                        continue;
-                    }
-                    
-                    const rawFundings = await fetchFundingFromLighter(authToken, accountIndex);
+                for (const accountIndex of selectedAccounts) {
+                    const rawFundings = await fetchFundingFromLighter(readOnlyToken, accountIndex);
                     rawFundingData[accountIndex] = rawFundings;
                     
                     // Process funding data
