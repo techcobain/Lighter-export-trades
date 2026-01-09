@@ -1,16 +1,18 @@
-# Lighter Data Fetcher
+# Lighter Data Exporter
 
-A minimal web app to fetch and export trading history and funding payments from [Lighter Exchange](https://lighter.xyz).
+A web app to fetch and export trading data from [Lighter Exchange](https://lighter.xyz) — trades, funding payments, deposits, transfers, and withdrawals.
 
 ## Features
 
+- **5 Data Types** — Trades, Funding, Deposits, Transfers, Withdrawals
 - **Multi-account support** — Fetch data from multiple sub-accounts simultaneously
-- **Trades & Funding** — Export both trade history and funding payments
+- **Read-only tokens** — Uses secure read-only auth tokens (can't trade or withdraw)
+- **Transfer filtering** — Filter by type (Incoming, Outgoing, Internal, Pool Mint/Burn)
 - **Customizable columns** — Choose which fields to display and export
 - **CSV & JSON export** — Per-account downloads in both formats
+- **Click to copy** — Copy transaction hashes and addresses with one click
+- **Asset symbols** — Automatic mapping of asset IDs to symbols (cached hourly)
 - **Automatic pagination** — Handles rate limits and fetches all data
-- **Extended auth** — Option for 60-minute tokens for large datasets
-- **Secure by design** — Private keys only used server-side, never stored
 
 ## Quick Start
 
@@ -28,6 +30,30 @@ python main.py
 
 Visit `http://localhost:8000`
 
+## How to Use
+
+1. Enter your L1 address and click "Lookup Accounts"
+2. Get a read-only token from [app.lighter.xyz/read-only-tokens](https://app.lighter.xyz/read-only-tokens)
+3. Select the accounts you want to export data from
+4. Click any of the 5 fetch buttons to retrieve data
+5. Export as CSV or JSON
+
+## Data Types
+
+| Type | Endpoint | Description |
+|------|----------|-------------|
+| **Trades** | `/api/v1/trades` | Trade history with PnL calculation |
+| **Funding** | `/api/v1/positionFunding` | Funding payments on positions |
+| **Deposits** | `/api/v1/deposit/history` | L1 deposits (Ethereum) |
+| **Transfers** | `/api/v1/transfer/history` | L2 transfers between accounts |
+| **Withdrawals** | `/api/v1/withdraw/history` | Withdrawals to L1 |
+
+### Transaction Hash Types
+
+- **Deposits** — Transaction Hash (L1): Processed on Ethereum, bridged via CCTP if from other chains
+- **Transfers** — Transaction Hash (L2): Processed on Lighter's app-chain, verify at [Lighter Explorer](https://app.lighter.xyz/explorer)
+- **Withdrawals** — Can be Ethereum or Arbitrum (IDs starting with "fast" are Arbitrum)
+
 ## Deploy to Railway
 
 1. Push to GitHub
@@ -38,11 +64,12 @@ Visit `http://localhost:8000`
 
 | Component | Description |
 |-----------|-------------|
-| Auth tokens | Generated server-side via Lighter SDK |
-| Data fetching | Client-side (rate limits per user IP) |
-| Processing | Server-side (market names, PnL calculation) |
+| Auth | Read-only tokens from Lighter (user-provided) |
+| Data fetching | Client-side direct to Lighter API |
+| Trade processing | Server-side (market names, PnL calculation) |
+| Asset mapping | Client-side with hourly cache |
 
-This hybrid approach distributes rate limits across users instead of centralizing them on the server.
+Data is fetched directly from your browser to Lighter's API, so rate limits apply to your IP (not the server).
 
 ## API Endpoints
 
@@ -50,19 +77,29 @@ This hybrid approach distributes rate limits across users instead of centralizin
 |----------|--------|-------------|
 | `/` | GET | Web interface |
 | `/api/lookup-accounts` | POST | Get account indexes for L1 address |
-| `/api/generate-auth` | POST | Generate auth tokens (10 or 60 min) |
 | `/api/process-trades` | POST | Process raw trades (add market names, PnL) |
 | `/api/markets` | GET | Cached market details |
+
+## Rate Limits
+
+| Data Type | Rate | Pages/Min |
+|-----------|------|-----------|
+| Trades | 3.5s delay | ~17 |
+| Funding | 1s delay | ~60 |
+| Deposits/Transfers/Withdrawals | 1s delay | ~60 |
+
+Close the Lighter frontend while fetching to avoid rate limit conflicts.
 
 ## Security
 
 ### Implemented Protections
 
+- **Read-only only** — Only accepts read-only tokens (can't trade or withdraw)
 - **Security headers** — CSP, HSTS, X-Frame-Options, X-Content-Type-Options
-- **Rate limiting** — Per-IP limits on all endpoints (DoS protection)
+- **Rate limiting** — Per-IP limits on server endpoints (DoS protection)
 - **XSS prevention** — All user/API data escaped before DOM insertion
 - **Sanitized errors** — No sensitive data leaked in error messages
-- **No storage** — Keys used only in-memory for token generation
+- **No storage** — Tokens used in-memory only, never logged or stored
 
 ### Headers Added
 
@@ -72,14 +109,6 @@ X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Strict-Transport-Security: max-age=31536000
 ```
-
-## Configuration
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `BASE_URL` | mainnet | Lighter API endpoint |
-| `TRADES_LIMIT` | 100 | Trades per API call |
-| `RATE_LIMIT_DELAY` | 3.5s | Delay between Lighter API calls |
 
 ## Tech Stack
 
