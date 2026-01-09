@@ -415,6 +415,17 @@
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
+            z-index: 10;
+            overflow: visible;
+        }
+
+        .trades-table th:has(.info-icon:hover) {
+            z-index: 1002;
+            overflow: visible;
+        }
+
+        .trades-table thead {
+            overflow: visible;
         }
 
         .trades-table td {
@@ -454,6 +465,109 @@
             max-width: 120px;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        /* Copyable field styles */
+        .copyable {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+        }
+
+        .copyable:hover {
+            color: var(--accent);
+        }
+
+        .copy-icon {
+            width: 14px;
+            height: 14px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+
+        .copyable:hover .copy-icon {
+            opacity: 1;
+        }
+
+        .copy-success {
+            color: var(--success) !important;
+        }
+
+        /* Info icon and tooltip styles */
+        .header-with-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--border);
+            color: var(--text-secondary);
+            font-size: 0.6rem;
+            font-weight: 600;
+            cursor: help;
+            position: relative;
+            z-index: 1;
+        }
+
+        .info-icon:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+            z-index: 1001;
+        }
+
+        .info-tooltip {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: normal;
+            white-space: normal;
+            width: 250px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            margin-top: 6px;
+            line-height: 1.4;
+            color: var(--text-secondary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .info-tooltip a {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+
+        .info-icon:hover .info-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .info-tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: var(--border);
         }
 
         .security-note {
@@ -641,7 +755,7 @@
     <div class="container">
         <header>
             <h1>Export <span>Lighter</span> Trading Data</h1>
-            <p class="subtitle">Fetch trading history and funding payments</p>
+            <p class="subtitle">Fetch trades, funding, deposits, transfers, and withdrawals</p>
         </header>
 
         <!-- FAQ Section -->
@@ -757,12 +871,21 @@
             </p>
             <div id="accountsList" class="accounts-list"></div>
             
-            <div class="btn-group">
+            <div class="btn-group" style="flex-wrap: wrap;">
                 <button class="btn-primary" id="fetchTradesBtn" onclick="fetchTrades()">
                     Fetch Trades
                 </button>
                 <button class="btn-primary" id="fetchFundingBtn" onclick="fetchFunding()">
                     Fetch Funding
+                </button>
+                <button class="btn-primary" id="fetchDepositsBtn" onclick="fetchDeposits()">
+                    Fetch Deposits
+                </button>
+                <button class="btn-primary" id="fetchTransfersBtn" onclick="fetchTransfers()">
+                    Fetch Transfers
+                </button>
+                <button class="btn-primary" id="fetchWithdrawalsBtn" onclick="fetchWithdrawals()">
+                    Fetch Withdrawals
                 </button>
             </div>
             <div id="fetchStatus" class="status"></div>
@@ -792,6 +915,53 @@
             <div id="fundingContents"></div>
         </div>
 
+        <!-- Deposits Results -->
+        <div class="card hidden" id="depositsCard">
+            <div class="card-title">Deposits</div>
+            <div id="depositsTabs" class="tabs"></div>
+            <div id="depositsContents"></div>
+        </div>
+
+        <!-- Transfers Results -->
+        <div class="card hidden" id="transfersCard">
+            <div class="card-title">Transfers</div>
+            <!-- Type Filter -->
+            <div class="type-filter" id="transferTypeFilter" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Filter by Type:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <label class="column-option active" onclick="toggleTransferType('L2TransferOutflow')">
+                        <input type="checkbox" checked onchange="toggleTransferType('L2TransferOutflow')" onclick="event.stopPropagation()">
+                        Outgoing Transfer
+                    </label>
+                    <label class="column-option active" onclick="toggleTransferType('L2TransferInflow')">
+                        <input type="checkbox" checked onchange="toggleTransferType('L2TransferInflow')" onclick="event.stopPropagation()">
+                        Incoming Transfer
+                    </label>
+                    <label class="column-option active" onclick="toggleTransferType('L2SelfTransfer')">
+                        <input type="checkbox" checked onchange="toggleTransferType('L2SelfTransfer')" onclick="event.stopPropagation()">
+                        Internal Transfer
+                    </label>
+                    <label class="column-option active" onclick="toggleTransferType('L2MintSharesOutflow')">
+                        <input type="checkbox" checked onchange="toggleTransferType('L2MintSharesOutflow')" onclick="event.stopPropagation()">
+                        Public Pool Mint
+                    </label>
+                    <label class="column-option active" onclick="toggleTransferType('L2BurnSharesInflow')">
+                        <input type="checkbox" checked onchange="toggleTransferType('L2BurnSharesInflow')" onclick="event.stopPropagation()">
+                        Public Pool Burn
+                    </label>
+                </div>
+            </div>
+            <div id="transfersTabs" class="tabs"></div>
+            <div id="transfersContents"></div>
+        </div>
+
+        <!-- Withdrawals Results -->
+        <div class="card hidden" id="withdrawalsCard">
+            <div class="card-title">Withdrawals</div>
+            <div id="withdrawalsTabs" class="tabs"></div>
+            <div id="withdrawalsContents"></div>
+        </div>
+
         <div class="security-note">
             <strong>Security Note:</strong> This app uses read-only auth tokens — they can only view data, not trade or withdraw.
             Trade data is fetched directly from your browser to Lighter's API (rate limits apply to your IP). 
@@ -817,6 +987,40 @@
                 .replace(/'/g, "&#039;");
         }
         
+        // Copy to clipboard function (uses data-copy attribute for safety)
+        function copyToClipboard(element) {
+            const text = element.dataset.copy;
+            if (!text || text === 'null' || text === 'undefined') {
+                return;
+            }
+            navigator.clipboard.writeText(text).then(() => {
+                // Visual feedback
+                element.classList.add('copy-success');
+                const span = element.querySelector('.tx-hash');
+                if (span) {
+                    const originalText = span.textContent;
+                    span.textContent = 'Copied!';
+                    setTimeout(() => {
+                        span.textContent = originalText;
+                        element.classList.remove('copy-success');
+                    }, 1000);
+                }
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+        
+        // SVG icons
+        const COPY_ICON_SVG = `<svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+        
+        // CSV escape helper - properly escapes values for CSV format
+        function csvEscape(value) {
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            // Escape double quotes by doubling them, wrap in quotes
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        
         // FAQ Toggle - Main section
         function toggleFaqSection() {
             const container = document.querySelector('.faq-container');
@@ -838,6 +1042,79 @@
         let rawTradesData = {}; // { accountIndex: [raw trades from API] }
         let fundingData = {}; // { accountIndex: { fundings: [...], ... } }
         let rawFundingData = {}; // { accountIndex: [raw funding from API] }
+        let depositsData = {}; // { accountIndex: { deposits: [...], ... } }
+        let rawDepositsData = {}; // { accountIndex: [raw deposits from API] }
+        let transfersData = {}; // { accountIndex: { transfers: [...], ... } }
+        let rawTransfersData = {}; // { accountIndex: [raw transfers from API] }
+        let withdrawalsData = {}; // { accountIndex: { withdrawals: [...], ... } }
+        let rawWithdrawalsData = {}; // { accountIndex: [raw withdrawals from API] }
+        
+        // Asset cache for mapping asset_id to symbol
+        let assetCache = {};
+        let assetCacheTimestamp = 0;
+        const ASSET_CACHE_TTL = 3600000; // 1 hour in ms
+        
+        // Transfer type mappings
+        const TRANSFER_TYPE_MAP = {
+            'L2TransferOutflow': 'Outgoing Transfer',
+            'L2BurnSharesInflow': 'Public Pool Burn',
+            'L2MintSharesOutflow': 'Public Pool Mint',
+            'L2SelfTransfer': 'Internal Transfer',
+            'L2TransferInflow': 'Incoming Transfer'
+        };
+        
+        // Transfer type filter state (all enabled by default)
+        let transferTypeFilters = {
+            'L2TransferOutflow': true,
+            'L2BurnSharesInflow': true,
+            'L2MintSharesOutflow': true,
+            'L2SelfTransfer': true,
+            'L2TransferInflow': true
+        };
+        
+        // Fetch asset details and cache them
+        async function fetchAssetDetails() {
+            const now = Date.now();
+            if (Object.keys(assetCache).length > 0 && (now - assetCacheTimestamp) < ASSET_CACHE_TTL) {
+                return assetCache;
+            }
+            
+            try {
+                const response = await fetch(`${LIGHTER_API}/api/v1/assetDetails`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.code === 200 && data.asset_details) {
+                        assetCache = {};
+                        data.asset_details.forEach(asset => {
+                            assetCache[asset.asset_id] = {
+                                symbol: asset.symbol,
+                                name: asset.name || asset.symbol,
+                                decimals: asset.decimals || 8
+                            };
+                        });
+                        assetCacheTimestamp = now;
+                    } else {
+                        console.warn('Asset details API returned unexpected format');
+                    }
+                } else {
+                    console.warn(`Asset details fetch failed with status: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Error fetching asset details:', error);
+                // Show warning to user if this is first fetch (no cache)
+                if (Object.keys(assetCache).length === 0) {
+                    showStatus('fetchStatus', 'Warning: Could not load asset symbols. Asset IDs will be shown instead.', 'loading');
+                    await new Promise(r => setTimeout(r, 2000)); // Show for 2 seconds
+                }
+            }
+            return assetCache;
+        }
+        
+        // Get asset symbol by ID
+        function getAssetSymbol(assetId) {
+            const asset = assetCache[assetId];
+            return asset ? asset.symbol : `Asset #${assetId}`;
+        }
         
         // All available columns with display names and default visibility
         const ALL_COLUMNS = {
@@ -1024,6 +1301,15 @@
         const LIGHTER_API = 'https://mainnet.zklighter.elliot.ai';
         const RATE_LIMIT_DELAY = 3500; // 3.5s between trade calls (20/min limit)
         const FUNDING_RATE_LIMIT_DELAY = 1000; // 1s between funding calls (60/min limit)
+        const WALLET_RATE_LIMIT_DELAY = 1000; // 1s between wallet calls (60/min limit)
+        
+        // Helper to disable/enable all fetch buttons
+        function setAllFetchButtonsDisabled(disabled) {
+            ['fetchTradesBtn', 'fetchFundingBtn', 'fetchDepositsBtn', 'fetchTransfersBtn', 'fetchWithdrawalsBtn'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = disabled;
+            });
+        }
         
         
         // Fetch trades from Lighter API directly (client-side)
@@ -1104,9 +1390,7 @@
             }
 
             const btn = document.getElementById('fetchTradesBtn');
-            const fundingBtn = document.getElementById('fetchFundingBtn');
-            btn.disabled = true;
-            fundingBtn.disabled = true;
+            setAllFetchButtonsDisabled(true);
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
             
             try {
@@ -1167,8 +1451,7 @@
             } catch (error) {
                 showStatus('fetchStatus', `Error: ${error.message}`, 'error');
             } finally {
-                btn.disabled = false;
-                fundingBtn.disabled = false;
+                setAllFetchButtonsDisabled(false);
                 btn.textContent = 'Fetch Trades';
             }
         }
@@ -1472,9 +1755,7 @@
             }
             
             const btn = document.getElementById('fetchFundingBtn');
-            const tradesBtn = document.getElementById('fetchTradesBtn');
-            btn.disabled = true;
-            tradesBtn.disabled = true;
+            setAllFetchButtonsDisabled(true);
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
             
             try {
@@ -1506,8 +1787,7 @@
             } catch (error) {
                 showStatus('fetchStatus', `Error: ${error.message}`, 'error');
             } finally {
-                btn.disabled = false;
-                tradesBtn.disabled = false;
+                setAllFetchButtonsDisabled(false);
                 btn.textContent = 'Fetch Funding';
             }
         }
@@ -1685,6 +1965,977 @@
             const now = new Date();
             const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
             const filename = `lighter_funding_account_${accountIndex}_${timestamp}.json`;
+            
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+        }
+        
+        // ===== DEPOSITS =====
+        
+        // Get L1 address from input
+        function getL1Address() {
+            return document.getElementById('l1Address').value.trim();
+        }
+        
+        // Fetch deposits from Lighter API
+        async function fetchDepositsFromLighter(authToken, accountIndex) {
+            const allDeposits = [];
+            let cursor = null;
+            let page = 0;
+            const l1Address = getL1Address();
+            
+            while (true) {
+                page++;
+                const params = new URLSearchParams({
+                    account_index: accountIndex,
+                    l1_address: l1Address
+                });
+                if (cursor) {
+                    params.append('cursor', cursor);
+                }
+                
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching deposits page ${page}...`, 'loading');
+                
+                try {
+                    const response = await fetch(`${LIGHTER_API}/api/v1/deposit/history?${params}`, {
+                        headers: { 'Authorization': authToken }
+                    });
+                    
+                    if (response.status === 429) {
+                        showStatus('fetchStatus', `Rate limited, waiting 15s...`, 'loading');
+                        await new Promise(r => setTimeout(r, 15000));
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                        console.error(`HTTP error: ${response.status}`);
+                        break;
+                    }
+                    
+                    const data = await response.json();
+                    if (data.code !== 200) {
+                        console.error(`API error: ${data.code}`);
+                        break;
+                    }
+                    
+                    const deposits = data.deposits || [];
+                    allDeposits.push(...deposits);
+                    
+                    if (!data.cursor || deposits.length === 0) {
+                        break;
+                    }
+                    
+                    cursor = data.cursor;
+                    await new Promise(r => setTimeout(r, WALLET_RATE_LIMIT_DELAY));
+                    
+                } catch (error) {
+                    console.error(`Error fetching deposits: ${error}`);
+                    break;
+                }
+            }
+            
+            return allDeposits;
+        }
+        
+        // Fetch deposits for all selected accounts
+        async function fetchDeposits() {
+            if (!readOnlyToken) {
+                showStatus('fetchStatus', 'Please enter a read-only token first', 'error');
+                return;
+            }
+            
+            const selectedAccounts = getSelectedAccounts();
+            if (selectedAccounts.length === 0) {
+                showStatus('fetchStatus', 'Please select at least one account', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('fetchDepositsBtn');
+            setAllFetchButtonsDisabled(true);
+            btn.innerHTML = '<span class="spinner"></span>Fetching...';
+            
+            try {
+                // Fetch asset details first
+                await fetchAssetDetails();
+                
+                depositsData = {};
+                rawDepositsData = {};
+                
+                for (const accountIndex of selectedAccounts) {
+                    const rawDeposits = await fetchDepositsFromLighter(readOnlyToken, accountIndex);
+                    rawDepositsData[accountIndex] = rawDeposits;
+                    
+                    // Process deposits
+                    const processed = processDeposits(rawDeposits);
+                    depositsData[accountIndex] = {
+                        success: true,
+                        total_deposits: processed.length,
+                        deposits: processed
+                    };
+                }
+                
+                let totalDeposits = 0;
+                Object.values(depositsData).forEach(acc => {
+                    totalDeposits += acc.total_deposits || 0;
+                });
+                
+                showStatus('fetchStatus', `Successfully fetched ${totalDeposits} deposits`, 'success');
+                displayDepositsResults();
+                document.getElementById('depositsCard').classList.remove('hidden');
+                
+            } catch (error) {
+                showStatus('fetchStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                setAllFetchButtonsDisabled(false);
+                btn.textContent = 'Fetch Deposits';
+            }
+        }
+        
+        // Process deposits data
+        function processDeposits(rawDeposits) {
+            return rawDeposits.map(d => {
+                const timestamp = d.timestamp;
+                const dt = new Date(timestamp);
+                const dateStr = dt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+                
+                return {
+                    id: d.id,
+                    asset: getAssetSymbol(d.asset_id),
+                    amount: d.amount,
+                    datetime_utc: dateStr,
+                    l1_tx_hash: d.l1_tx_hash
+                };
+            });
+        }
+        
+        // Display deposits results
+        function displayDepositsResults() {
+            const tabsContainer = document.getElementById('depositsTabs');
+            const contentsContainer = document.getElementById('depositsContents');
+            tabsContainer.innerHTML = '';
+            contentsContainer.innerHTML = '';
+            
+            const accountIds = Object.keys(depositsData);
+            
+            accountIds.forEach((accountIndex, i) => {
+                const accountData = depositsData[accountIndex];
+                const isFirst = i === 0;
+                
+                // Create tab
+                const tab = document.createElement('div');
+                tab.className = `tab ${isFirst ? 'active' : ''}`;
+                tab.textContent = `Account #${accountIndex}`;
+                tab.onclick = () => switchDepositsTab(accountIndex);
+                tab.id = `deposits-tab-${accountIndex}`;
+                tabsContainer.appendChild(tab);
+                
+                // Create content
+                const content = document.createElement('div');
+                content.className = `tab-content ${isFirst ? 'active' : ''}`;
+                content.id = `deposits-content-${accountIndex}`;
+                
+                if (!accountData.success || accountData.deposits.length === 0) {
+                    content.innerHTML = `<div class="error-message">No deposits found</div>`;
+                } else {
+                    const safeAccountIndex = parseInt(accountIndex, 10);
+                    const safeTotal = parseInt(accountData.total_deposits, 10) || 0;
+                    content.innerHTML = `
+                        <div class="results-header">
+                            <span class="results-stats">${safeTotal} deposits</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-secondary btn-small" onclick="exportDepositsCSV(${safeAccountIndex})">
+                                    CSV
+                                </button>
+                                <button class="btn-secondary btn-small" onclick="exportDepositsJSON(${safeAccountIndex})">
+                                    JSON
+                                </button>
+                            </div>
+                        </div>
+                        <div class="results-box">
+                            ${buildDepositsTable(accountData.deposits)}
+                        </div>
+                    `;
+                }
+                
+                contentsContainer.appendChild(content);
+            });
+        }
+        
+        // Build deposits table
+        function buildDepositsTable(deposits) {
+            let html = '<table class="trades-table"><thead><tr>';
+            html += `<th>ID</th><th>Asset</th><th>Amount</th><th>Time (UTC)</th>
+                <th><span class="header-with-info">Transaction Hash (L1)
+                    <span class="info-icon">i<span class="info-tooltip">Deposits are always processed on Ethereum. If you select to deposit from different chains, Lighter will bridge them using e.g. CCTP</span></span>
+                </span></th>`;
+            html += '</tr></thead><tbody>';
+            
+            deposits.forEach(d => {
+                const hash = d.l1_tx_hash || '';
+                const shortHash = hash ? hash.substring(0, 16) + '...' : 'N/A';
+                const safeHash = escapeHtml(hash);
+                html += `<tr>
+                    <td>${escapeHtml(d.id)}</td>
+                    <td><span class="trade-market">${escapeHtml(d.asset)}</span></td>
+                    <td>${escapeHtml(d.amount)}</td>
+                    <td>${escapeHtml(d.datetime_utc)}</td>
+                    <td>${hash ? `<span class="copyable" data-copy="${safeHash}" onclick="copyToClipboard(this)" title="Click to copy">
+                        <span class="tx-hash">${escapeHtml(shortHash)}</span>${COPY_ICON_SVG}
+                    </span>` : '<span class="tx-hash">N/A</span>'}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        // Switch deposits tab
+        function switchDepositsTab(accountIndex) {
+            document.querySelectorAll('#depositsTabs .tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`deposits-tab-${accountIndex}`).classList.add('active');
+            
+            document.querySelectorAll('#depositsContents .tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`deposits-content-${accountIndex}`).classList.add('active');
+        }
+        
+        // Export deposits as CSV
+        function exportDepositsCSV(accountIndex) {
+            const data = depositsData[accountIndex];
+            if (!data || !data.deposits || data.deposits.length === 0) {
+                alert('No deposits to export');
+                return;
+            }
+            
+            const headers = ['ID', 'Asset', 'Amount', 'Time (UTC)', 'Transaction Hash (L1)'];
+            const csvRows = [headers.join(',')];
+            
+            data.deposits.forEach(d => {
+                csvRows.push([
+                    csvEscape(d.id),
+                    csvEscape(d.asset),
+                    csvEscape(d.amount),
+                    csvEscape(d.datetime_utc),
+                    csvEscape(d.l1_tx_hash)
+                ].join(','));
+            });
+            
+            const csvContent = csvRows.join('\n');
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_deposits_account_${accountIndex}_${timestamp}.csv`;
+            
+            const BOM = '\uFEFF';
+            const encodedContent = encodeURIComponent(BOM + csvContent);
+            const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+            
+            const a = document.createElement('a');
+            a.href = dataUri;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+        
+        // Export deposits as JSON
+        function exportDepositsJSON(accountIndex) {
+            const rawDeposits = rawDepositsData[accountIndex];
+            if (!rawDeposits || rawDeposits.length === 0) {
+                alert('No deposits to export');
+                return;
+            }
+            
+            const jsonContent = JSON.stringify({
+                exported_at: new Date().toISOString(),
+                account_index: parseInt(accountIndex),
+                total_deposits: rawDeposits.length,
+                deposits: rawDeposits
+            }, null, 2);
+            
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_deposits_account_${accountIndex}_${timestamp}.json`;
+            
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+        }
+        
+        // ===== TRANSFERS =====
+        
+        // Toggle transfer type filter
+        function toggleTransferType(type) {
+            transferTypeFilters[type] = !transferTypeFilters[type];
+            
+            // Update UI checkbox state
+            const filterContainer = document.getElementById('transferTypeFilter');
+            const labels = filterContainer.querySelectorAll('.column-option');
+            labels.forEach(label => {
+                const checkbox = label.querySelector('input');
+                const labelText = label.textContent.trim();
+                const mappedType = Object.entries(TRANSFER_TYPE_MAP).find(([k, v]) => v === labelText);
+                if (mappedType) {
+                    const isActive = transferTypeFilters[mappedType[0]];
+                    checkbox.checked = isActive;
+                    if (isActive) {
+                        label.classList.add('active');
+                    } else {
+                        label.classList.remove('active');
+                    }
+                }
+            });
+            
+            // Re-render if we have data
+            if (Object.keys(transfersData).length > 0) {
+                displayTransfersResults();
+            }
+        }
+        
+        // Fetch transfers from Lighter API
+        async function fetchTransfersFromLighter(authToken, accountIndex) {
+            const allTransfers = [];
+            let cursor = null;
+            let page = 0;
+            
+            while (true) {
+                page++;
+                const params = new URLSearchParams({
+                    account_index: accountIndex
+                });
+                if (cursor) {
+                    params.append('cursor', cursor);
+                }
+                
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching transfers page ${page}...`, 'loading');
+                
+                try {
+                    const response = await fetch(`${LIGHTER_API}/api/v1/transfer/history?${params}`, {
+                        headers: { 'Authorization': authToken }
+                    });
+                    
+                    if (response.status === 429) {
+                        showStatus('fetchStatus', `Rate limited, waiting 15s...`, 'loading');
+                        await new Promise(r => setTimeout(r, 15000));
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                        console.error(`HTTP error: ${response.status}`);
+                        break;
+                    }
+                    
+                    const data = await response.json();
+                    if (data.code !== 200) {
+                        console.error(`API error: ${data.code}`);
+                        break;
+                    }
+                    
+                    const transfers = data.transfers || [];
+                    allTransfers.push(...transfers);
+                    
+                    if (!data.cursor || transfers.length === 0) {
+                        break;
+                    }
+                    
+                    cursor = data.cursor;
+                    await new Promise(r => setTimeout(r, WALLET_RATE_LIMIT_DELAY));
+                    
+                } catch (error) {
+                    console.error(`Error fetching transfers: ${error}`);
+                    break;
+                }
+            }
+            
+            return allTransfers;
+        }
+        
+        // Fetch transfers for all selected accounts
+        async function fetchTransfers() {
+            if (!readOnlyToken) {
+                showStatus('fetchStatus', 'Please enter a read-only token first', 'error');
+                return;
+            }
+            
+            const selectedAccounts = getSelectedAccounts();
+            if (selectedAccounts.length === 0) {
+                showStatus('fetchStatus', 'Please select at least one account', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('fetchTransfersBtn');
+            setAllFetchButtonsDisabled(true);
+            btn.innerHTML = '<span class="spinner"></span>Fetching...';
+            
+            try {
+                // Fetch asset details first
+                await fetchAssetDetails();
+                
+                transfersData = {};
+                rawTransfersData = {};
+                
+                for (const accountIndex of selectedAccounts) {
+                    const rawTransfers = await fetchTransfersFromLighter(readOnlyToken, accountIndex);
+                    rawTransfersData[accountIndex] = rawTransfers;
+                    
+                    // Process transfers
+                    const processed = processTransfers(rawTransfers);
+                    transfersData[accountIndex] = {
+                        success: true,
+                        total_transfers: processed.length,
+                        transfers: processed
+                    };
+                }
+                
+                let totalTransfers = 0;
+                Object.values(transfersData).forEach(acc => {
+                    totalTransfers += acc.total_transfers || 0;
+                });
+                
+                showStatus('fetchStatus', `Successfully fetched ${totalTransfers} transfers`, 'success');
+                displayTransfersResults();
+                document.getElementById('transfersCard').classList.remove('hidden');
+                
+            } catch (error) {
+                showStatus('fetchStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                setAllFetchButtonsDisabled(false);
+                btn.textContent = 'Fetch Transfers';
+            }
+        }
+        
+        // Process transfers data
+        function processTransfers(rawTransfers) {
+            return rawTransfers.map(t => {
+                const timestamp = t.timestamp;
+                const dt = new Date(timestamp);
+                const dateStr = dt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+                
+                // Map type to friendly name
+                const typeLabel = TRANSFER_TYPE_MAP[t.type] || t.type;
+                
+                return {
+                    id: t.id,
+                    asset: getAssetSymbol(t.asset_id),
+                    amount: t.amount,
+                    fee: t.fee,
+                    datetime_utc: dateStr,
+                    type: typeLabel,
+                    raw_type: t.type, // Keep raw type for filtering
+                    from_l1_address: t.from_l1_address,
+                    to_l1_address: t.to_l1_address,
+                    from_account_index: t.from_account_index,
+                    to_account_index: t.to_account_index,
+                    from_route: t.from_route,
+                    to_route: t.to_route,
+                    tx_hash: t.tx_hash
+                };
+            });
+        }
+        
+        // Get filtered transfers based on type filters
+        function getFilteredTransfers(transfers) {
+            return transfers.filter(t => transferTypeFilters[t.raw_type]);
+        }
+        
+        // Display transfers results
+        function displayTransfersResults() {
+            const tabsContainer = document.getElementById('transfersTabs');
+            const contentsContainer = document.getElementById('transfersContents');
+            tabsContainer.innerHTML = '';
+            contentsContainer.innerHTML = '';
+            
+            const accountIds = Object.keys(transfersData);
+            
+            accountIds.forEach((accountIndex, i) => {
+                const accountData = transfersData[accountIndex];
+                const isFirst = i === 0;
+                
+                // Create tab
+                const tab = document.createElement('div');
+                tab.className = `tab ${isFirst ? 'active' : ''}`;
+                tab.textContent = `Account #${accountIndex}`;
+                tab.onclick = () => switchTransfersTab(accountIndex);
+                tab.id = `transfers-tab-${accountIndex}`;
+                tabsContainer.appendChild(tab);
+                
+                // Create content
+                const content = document.createElement('div');
+                content.className = `tab-content ${isFirst ? 'active' : ''}`;
+                content.id = `transfers-content-${accountIndex}`;
+                
+                const filteredTransfers = getFilteredTransfers(accountData.transfers);
+                
+                if (!accountData.success || filteredTransfers.length === 0) {
+                    content.innerHTML = `<div class="error-message">No transfers found (check type filters above)</div>`;
+                } else {
+                    const safeAccountIndex = parseInt(accountIndex, 10);
+                    content.innerHTML = `
+                        <div class="results-header">
+                            <span class="results-stats">${filteredTransfers.length} transfers (${accountData.total_transfers} total)</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-secondary btn-small" onclick="exportTransfersCSV(${safeAccountIndex})">
+                                    CSV
+                                </button>
+                                <button class="btn-secondary btn-small" onclick="exportTransfersJSON(${safeAccountIndex})">
+                                    JSON
+                                </button>
+                            </div>
+                        </div>
+                        <div class="results-box">
+                            ${buildTransfersTable(filteredTransfers)}
+                        </div>
+                    `;
+                }
+                
+                contentsContainer.appendChild(content);
+            });
+        }
+        
+        // Build transfers table
+        function buildTransfersTable(transfers) {
+            let html = '<table class="trades-table"><thead><tr>';
+            html += '<th>ID</th><th>Asset</th><th>Amount</th><th>Fee</th><th>Time (UTC)</th><th>Type</th>';
+            html += `<th>From Address</th><th>To Address</th><th>From Account</th><th>To Account</th>
+                <th>From Route</th><th>To Route</th>
+                <th><span class="header-with-info">Transaction Hash (L2)
+                    <span class="info-icon">i<span class="info-tooltip">These transactions are processed solely on Lighter's app-chain, to verify them you can use the <a href="https://app.lighter.xyz/explorer" target="_blank">Lighter explorer</a></span></span>
+                </span></th>`;
+            html += '</tr></thead><tbody>';
+            
+            transfers.forEach(t => {
+                const fromAddr = t.from_l1_address || '';
+                const toAddr = t.to_l1_address || '';
+                const txHash = t.tx_hash || '';
+                const shortFromAddr = fromAddr ? fromAddr.substring(0, 10) + '...' : 'N/A';
+                const shortToAddr = toAddr ? toAddr.substring(0, 10) + '...' : 'N/A';
+                const shortHash = txHash ? txHash.substring(0, 16) + '...' : 'N/A';
+                
+                // Color type based on direction
+                let typeClass = '';
+                if (t.type.includes('Outgoing') || t.type.includes('Mint')) {
+                    typeClass = 'short'; // Red for outgoing
+                } else if (t.type.includes('Incoming') || t.type.includes('Burn')) {
+                    typeClass = 'long'; // Green for incoming
+                }
+                
+                html += `<tr>
+                    <td>${escapeHtml(t.id)}</td>
+                    <td><span class="trade-market">${escapeHtml(t.asset)}</span></td>
+                    <td>${escapeHtml(t.amount)}</td>
+                    <td>${escapeHtml(t.fee)}</td>
+                    <td>${escapeHtml(t.datetime_utc)}</td>
+                    <td><span class="trade-side ${typeClass}">${escapeHtml(t.type)}</span></td>
+                    <td>${fromAddr ? `<span class="copyable" data-copy="${escapeHtml(fromAddr)}" onclick="copyToClipboard(this)" title="Click to copy">
+                        <span class="tx-hash">${escapeHtml(shortFromAddr)}</span>${COPY_ICON_SVG}
+                    </span>` : '<span class="tx-hash">N/A</span>'}</td>
+                    <td>${toAddr ? `<span class="copyable" data-copy="${escapeHtml(toAddr)}" onclick="copyToClipboard(this)" title="Click to copy">
+                        <span class="tx-hash">${escapeHtml(shortToAddr)}</span>${COPY_ICON_SVG}
+                    </span>` : '<span class="tx-hash">N/A</span>'}</td>
+                    <td>${escapeHtml(t.from_account_index)}</td>
+                    <td>${escapeHtml(t.to_account_index)}</td>
+                    <td>${escapeHtml(t.from_route)}</td>
+                    <td>${escapeHtml(t.to_route)}</td>
+                    <td>${txHash ? `<span class="copyable" data-copy="${escapeHtml(txHash)}" onclick="copyToClipboard(this)" title="Click to copy">
+                        <span class="tx-hash">${escapeHtml(shortHash)}</span>${COPY_ICON_SVG}
+                    </span>` : '<span class="tx-hash">N/A</span>'}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        // Switch transfers tab
+        function switchTransfersTab(accountIndex) {
+            document.querySelectorAll('#transfersTabs .tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`transfers-tab-${accountIndex}`).classList.add('active');
+            
+            document.querySelectorAll('#transfersContents .tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`transfers-content-${accountIndex}`).classList.add('active');
+        }
+        
+        // Export transfers as CSV (only filtered types)
+        function exportTransfersCSV(accountIndex) {
+            const data = transfersData[accountIndex];
+            if (!data || !data.transfers || data.transfers.length === 0) {
+                alert('No transfers to export');
+                return;
+            }
+            
+            const filteredTransfers = getFilteredTransfers(data.transfers);
+            if (filteredTransfers.length === 0) {
+                alert('No transfers match the current type filters');
+                return;
+            }
+            
+            const headers = ['ID', 'Asset', 'Amount', 'Fee', 'Time (UTC)', 'Type', 'From Address', 'To Address', 'From Account', 'To Account', 'From Route', 'To Route', 'Transaction Hash (L2)'];
+            const csvRows = [headers.join(',')];
+            
+            filteredTransfers.forEach(t => {
+                csvRows.push([
+                    csvEscape(t.id),
+                    csvEscape(t.asset),
+                    csvEscape(t.amount),
+                    csvEscape(t.fee),
+                    csvEscape(t.datetime_utc),
+                    csvEscape(t.type),
+                    csvEscape(t.from_l1_address),
+                    csvEscape(t.to_l1_address),
+                    csvEscape(t.from_account_index),
+                    csvEscape(t.to_account_index),
+                    csvEscape(t.from_route),
+                    csvEscape(t.to_route),
+                    csvEscape(t.tx_hash)
+                ].join(','));
+            });
+            
+            const csvContent = csvRows.join('\n');
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_transfers_account_${accountIndex}_${timestamp}.csv`;
+            
+            const BOM = '\uFEFF';
+            const encodedContent = encodeURIComponent(BOM + csvContent);
+            const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+            
+            const a = document.createElement('a');
+            a.href = dataUri;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+        
+        // Export transfers as JSON
+        function exportTransfersJSON(accountIndex) {
+            const rawTransfers = rawTransfersData[accountIndex];
+            if (!rawTransfers || rawTransfers.length === 0) {
+                alert('No transfers to export');
+                return;
+            }
+            
+            const jsonContent = JSON.stringify({
+                exported_at: new Date().toISOString(),
+                account_index: parseInt(accountIndex),
+                total_transfers: rawTransfers.length,
+                transfers: rawTransfers
+            }, null, 2);
+            
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_transfers_account_${accountIndex}_${timestamp}.json`;
+            
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+        }
+        
+        // ===== WITHDRAWALS =====
+        
+        // Fetch withdrawals from Lighter API
+        async function fetchWithdrawalsFromLighter(authToken, accountIndex) {
+            const allWithdrawals = [];
+            let cursor = null;
+            let page = 0;
+            
+            while (true) {
+                page++;
+                const params = new URLSearchParams({
+                    account_index: accountIndex
+                });
+                if (cursor) {
+                    params.append('cursor', cursor);
+                }
+                
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching withdrawals page ${page}...`, 'loading');
+                
+                try {
+                    const response = await fetch(`${LIGHTER_API}/api/v1/withdraw/history?${params}`, {
+                        headers: { 'Authorization': authToken }
+                    });
+                    
+                    if (response.status === 429) {
+                        showStatus('fetchStatus', `Rate limited, waiting 15s...`, 'loading');
+                        await new Promise(r => setTimeout(r, 15000));
+                        continue;
+                    }
+                    
+                    if (!response.ok) {
+                        console.error(`HTTP error: ${response.status}`);
+                        break;
+                    }
+                    
+                    const data = await response.json();
+                    if (data.code !== 200) {
+                        console.error(`API error: ${data.code}`);
+                        break;
+                    }
+                    
+                    const withdrawals = data.withdraws || [];
+                    allWithdrawals.push(...withdrawals);
+                    
+                    if (!data.cursor || withdrawals.length === 0) {
+                        break;
+                    }
+                    
+                    cursor = data.cursor;
+                    await new Promise(r => setTimeout(r, WALLET_RATE_LIMIT_DELAY));
+                    
+                } catch (error) {
+                    console.error(`Error fetching withdrawals: ${error}`);
+                    break;
+                }
+            }
+            
+            return allWithdrawals;
+        }
+        
+        // Fetch withdrawals for all selected accounts
+        async function fetchWithdrawals() {
+            if (!readOnlyToken) {
+                showStatus('fetchStatus', 'Please enter a read-only token first', 'error');
+                return;
+            }
+            
+            const selectedAccounts = getSelectedAccounts();
+            if (selectedAccounts.length === 0) {
+                showStatus('fetchStatus', 'Please select at least one account', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('fetchWithdrawalsBtn');
+            setAllFetchButtonsDisabled(true);
+            btn.innerHTML = '<span class="spinner"></span>Fetching...';
+            
+            try {
+                // Fetch asset details first
+                await fetchAssetDetails();
+                
+                withdrawalsData = {};
+                rawWithdrawalsData = {};
+                
+                for (const accountIndex of selectedAccounts) {
+                    const rawWithdrawals = await fetchWithdrawalsFromLighter(readOnlyToken, accountIndex);
+                    rawWithdrawalsData[accountIndex] = rawWithdrawals;
+                    
+                    // Process withdrawals
+                    const processed = processWithdrawals(rawWithdrawals);
+                    withdrawalsData[accountIndex] = {
+                        success: true,
+                        total_withdrawals: processed.length,
+                        withdrawals: processed
+                    };
+                }
+                
+                let totalWithdrawals = 0;
+                Object.values(withdrawalsData).forEach(acc => {
+                    totalWithdrawals += acc.total_withdrawals || 0;
+                });
+                
+                showStatus('fetchStatus', `Successfully fetched ${totalWithdrawals} withdrawals`, 'success');
+                displayWithdrawalsResults();
+                document.getElementById('withdrawalsCard').classList.remove('hidden');
+                
+            } catch (error) {
+                showStatus('fetchStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                setAllFetchButtonsDisabled(false);
+                btn.textContent = 'Fetch Withdrawals';
+            }
+        }
+        
+        // Process withdrawals data
+        function processWithdrawals(rawWithdrawals) {
+            return rawWithdrawals.map(w => {
+                const timestamp = w.timestamp;
+                const dt = new Date(timestamp);
+                const dateStr = dt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+                
+                return {
+                    id: w.id,
+                    asset: getAssetSymbol(w.asset_id),
+                    amount: w.amount,
+                    datetime_utc: dateStr,
+                    l1_tx_hash: w.l1_tx_hash
+                };
+            });
+        }
+        
+        // Display withdrawals results
+        function displayWithdrawalsResults() {
+            const tabsContainer = document.getElementById('withdrawalsTabs');
+            const contentsContainer = document.getElementById('withdrawalsContents');
+            tabsContainer.innerHTML = '';
+            contentsContainer.innerHTML = '';
+            
+            const accountIds = Object.keys(withdrawalsData);
+            
+            accountIds.forEach((accountIndex, i) => {
+                const accountData = withdrawalsData[accountIndex];
+                const isFirst = i === 0;
+                
+                // Create tab
+                const tab = document.createElement('div');
+                tab.className = `tab ${isFirst ? 'active' : ''}`;
+                tab.textContent = `Account #${accountIndex}`;
+                tab.onclick = () => switchWithdrawalsTab(accountIndex);
+                tab.id = `withdrawals-tab-${accountIndex}`;
+                tabsContainer.appendChild(tab);
+                
+                // Create content
+                const content = document.createElement('div');
+                content.className = `tab-content ${isFirst ? 'active' : ''}`;
+                content.id = `withdrawals-content-${accountIndex}`;
+                
+                if (!accountData.success || accountData.withdrawals.length === 0) {
+                    content.innerHTML = `<div class="error-message">No withdrawals found</div>`;
+                } else {
+                    const safeAccountIndex = parseInt(accountIndex, 10);
+                    const safeTotal = parseInt(accountData.total_withdrawals, 10) || 0;
+                    content.innerHTML = `
+                        <div class="results-header">
+                            <span class="results-stats">${safeTotal} withdrawals</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-secondary btn-small" onclick="exportWithdrawalsCSV(${safeAccountIndex})">
+                                    CSV
+                                </button>
+                                <button class="btn-secondary btn-small" onclick="exportWithdrawalsJSON(${safeAccountIndex})">
+                                    JSON
+                                </button>
+                            </div>
+                        </div>
+                        <div class="results-box">
+                            ${buildWithdrawalsTable(accountData.withdrawals)}
+                        </div>
+                    `;
+                }
+                
+                contentsContainer.appendChild(content);
+            });
+        }
+        
+        // Build withdrawals table
+        function buildWithdrawalsTable(withdrawals) {
+            let html = '<table class="trades-table"><thead><tr>';
+            html += `<th>ID</th><th>Asset</th><th>Amount</th><th>Time (UTC)</th>
+                <th><span class="header-with-info">Transaction Hash
+                    <span class="info-icon">i<span class="info-tooltip">These transactions can be processed on both Ethereum and Arbitrum. If the ID starts with "fast", that means the withdraw was processed to Arbitrum</span></span>
+                </span></th>`;
+            html += '</tr></thead><tbody>';
+            
+            withdrawals.forEach(w => {
+                const hash = w.l1_tx_hash || '';
+                const shortHash = hash ? hash.substring(0, 16) + '...' : 'N/A';
+                html += `<tr>
+                    <td>${escapeHtml(w.id)}</td>
+                    <td><span class="trade-market">${escapeHtml(w.asset)}</span></td>
+                    <td>${escapeHtml(w.amount)}</td>
+                    <td>${escapeHtml(w.datetime_utc)}</td>
+                    <td>${hash ? `<span class="copyable" data-copy="${escapeHtml(hash)}" onclick="copyToClipboard(this)" title="Click to copy">
+                        <span class="tx-hash">${escapeHtml(shortHash)}</span>${COPY_ICON_SVG}
+                    </span>` : '<span class="tx-hash">N/A</span>'}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        // Switch withdrawals tab
+        function switchWithdrawalsTab(accountIndex) {
+            document.querySelectorAll('#withdrawalsTabs .tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`withdrawals-tab-${accountIndex}`).classList.add('active');
+            
+            document.querySelectorAll('#withdrawalsContents .tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`withdrawals-content-${accountIndex}`).classList.add('active');
+        }
+        
+        // Export withdrawals as CSV
+        function exportWithdrawalsCSV(accountIndex) {
+            const data = withdrawalsData[accountIndex];
+            if (!data || !data.withdrawals || data.withdrawals.length === 0) {
+                alert('No withdrawals to export');
+                return;
+            }
+            
+            const headers = ['ID', 'Asset', 'Amount', 'Time (UTC)', 'Transaction Hash'];
+            const csvRows = [headers.join(',')];
+            
+            data.withdrawals.forEach(w => {
+                csvRows.push([
+                    csvEscape(w.id),
+                    csvEscape(w.asset),
+                    csvEscape(w.amount),
+                    csvEscape(w.datetime_utc),
+                    csvEscape(w.l1_tx_hash)
+                ].join(','));
+            });
+            
+            const csvContent = csvRows.join('\n');
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_withdrawals_account_${accountIndex}_${timestamp}.csv`;
+            
+            const BOM = '\uFEFF';
+            const encodedContent = encodeURIComponent(BOM + csvContent);
+            const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+            
+            const a = document.createElement('a');
+            a.href = dataUri;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+        
+        // Export withdrawals as JSON
+        function exportWithdrawalsJSON(accountIndex) {
+            const rawWithdrawals = rawWithdrawalsData[accountIndex];
+            if (!rawWithdrawals || rawWithdrawals.length === 0) {
+                alert('No withdrawals to export');
+                return;
+            }
+            
+            const jsonContent = JSON.stringify({
+                exported_at: new Date().toISOString(),
+                account_index: parseInt(accountIndex),
+                total_withdrawals: rawWithdrawals.length,
+                withdrawals: rawWithdrawals
+            }, null, 2);
+            
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `lighter_withdrawals_account_${accountIndex}_${timestamp}.json`;
             
             const blob = new Blob([jsonContent], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
