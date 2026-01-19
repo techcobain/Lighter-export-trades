@@ -7,6 +7,8 @@ A web app to fetch and export trading data from [Lighter Exchange](https://light
 - **5 Data Types** — Trades, Funding, Deposits, Transfers, Withdrawals
 - **Multi-account support** — Fetch data from multiple sub-accounts simultaneously
 - **Read-only tokens** — Uses secure read-only auth tokens (can't trade or withdraw)
+- **Custom timeframes** — Export complete history or select specific date ranges
+- **Spot & Perp filtering** — Filter trades by market type (Perpetuals, Spot)
 - **Transfer filtering** — Filter by type (Incoming, Outgoing, Internal, Pool Mint/Burn)
 - **Customizable columns** — Choose which fields to display and export
 - **CSV & JSON export** — Per-account downloads in both formats
@@ -46,7 +48,7 @@ Visit `http://localhost:8000`
 | **Funding** | `/api/v1/positionFunding` | Funding payments on positions |
 | **Deposits** | `/api/v1/deposit/history` | L1 deposits (Ethereum) |
 | **Transfers** | `/api/v1/transfer/history` | L2 transfers between accounts |
-| **Withdrawals** | `/api/v1/withdraw/history` | Withdrawals to L1 |
+| **Withdrawals** | `/api/v1/withdraw/history` | Withdrawals to L1/L2 (Arbitrum) |
 
 ### Transaction Hash Types
 

@@ -97,6 +97,43 @@
             letter-spacing: 0.05em;
         }
 
+        .card-title.collapsible {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px 12px;
+            margin: -8px -12px 20px -12px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .card-title.collapsible:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .card-title .collapse-icon {
+            font-size: 0.8rem;
+            transition: transform 0.3s ease;
+        }
+
+        .card-title.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+
+        .card-content {
+            transition: max-height 0.3s ease, opacity 0.2s ease;
+            overflow: hidden;
+        }
+
+        .card-content.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -330,6 +367,188 @@
             accent-color: var(--accent);
         }
 
+        /* Timeframe Selector */
+        .timeframe-selector {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .timeframe-selector-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .timeframe-options {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .timeframe-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timeframe-option:hover {
+            border-color: var(--accent);
+        }
+
+        .timeframe-option.active {
+            border-color: var(--accent);
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .timeframe-option input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+
+        .timeframe-option label {
+            margin: 0;
+            text-transform: none;
+            letter-spacing: normal;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .timeframe-info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            font-size: 10px;
+            color: var(--text-secondary);
+            cursor: help;
+            position: relative;
+        }
+
+        .timeframe-info-icon:hover .timeframe-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .timeframe-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            z-index: 100;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .date-range-inputs {
+            display: none;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .date-range-inputs.visible {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .date-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .date-input-group label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .date-input-group input[type="datetime-local"],
+        .date-input-group input[type="date"],
+        .date-input-group input[type="time"] {
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            min-width: 160px;
+        }
+
+        .date-input-group input[type="datetime-local"]:focus,
+        .date-input-group input[type="date"]:focus,
+        .date-input-group input[type="time"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .date-input-group input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+        .date-input-group input[type="date"]::-webkit-calendar-picker-indicator,
+        .date-input-group input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
+            cursor: pointer;
+        }
+
+        .hours-toggle {
+            display: flex;
+            align-items: center;
+        }
+
+        .hours-toggle .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .hours-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .time-range-inputs {
+            display: none;
+            gap: 16px;
+            margin-top: 12px;
+        }
+
+        .time-range-inputs.visible {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
         /* Tabs */
         .tabs {
             display: flex;
@@ -449,6 +668,23 @@
 
         .trade-side.short {
             color: #ef4444;
+        }
+
+        .market-type {
+            font-weight: 500;
+            font-size: 0.85em;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .market-type.type-perp {
+            color: #a78bfa;
+            background: rgba(167, 139, 250, 0.15);
+        }
+
+        .market-type.type-spot {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.15);
         }
 
         .trade-pnl.profit {
@@ -871,6 +1107,53 @@
             </p>
             <div id="accountsList" class="accounts-list"></div>
             
+            <!-- Timeframe Selector -->
+            <div class="timeframe-selector">
+                <div class="timeframe-selector-title">Timeframe</div>
+                <div class="timeframe-options">
+                    <div class="timeframe-option active" onclick="selectTimeframe('complete')">
+                        <input type="radio" name="timeframe" id="timeframeComplete" value="complete" checked>
+                        <label for="timeframeComplete">Complete account history</label>
+                        <span class="timeframe-info-icon">i
+                            <span class="timeframe-tooltip">Fetches all data from account creation to present</span>
+                        </span>
+                    </div>
+                    <div class="timeframe-option" onclick="selectTimeframe('custom')">
+                        <input type="radio" name="timeframe" id="timeframeCustom" value="custom">
+                        <label for="timeframeCustom">Custom timeframe</label>
+                        <span class="timeframe-info-icon">i
+                            <span class="timeframe-tooltip">Select specific start and end dates</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="date-range-inputs" id="dateRangeInputs">
+                    <div class="date-input-group">
+                        <label for="dateFrom">From (Start)</label>
+                        <input type="date" id="dateFrom">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="dateTo">To (End)</label>
+                        <input type="date" id="dateTo">
+                    </div>
+                    <div class="date-input-group hours-toggle">
+                        <label class="checkbox-label" onclick="toggleHoursSelection()">
+                            <input type="checkbox" id="includeHours">
+                            <span>Include specific hours</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="time-range-inputs" id="timeRangeInputs">
+                    <div class="date-input-group">
+                        <label for="timeFrom">Start Time</label>
+                        <input type="time" id="timeFrom" value="00:00">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="timeTo">End Time</label>
+                        <input type="time" id="timeTo" value="23:59">
+                    </div>
+                </div>
+            </div>
+            
             <div class="btn-group" style="flex-wrap: wrap;">
                 <button class="btn-primary" id="fetchTradesBtn" onclick="fetchTrades()">
                     Fetch Trades
@@ -893,73 +1176,112 @@
 
         <!-- Step 3: Results -->
         <div class="card hidden" id="resultsCard">
-            <div class="card-title">Trade History</div>
-            
-            <!-- Column Selector -->
-            <div class="column-selector expanded" id="columnSelector">
-                <div class="column-selector-header" onclick="toggleColumnSelector()">
-                    <span>Select Columns to Display/Export</span>
-                    <span id="toggleIcon">▼</span>
-                </div>
-                <div class="column-options" id="columnOptions"></div>
+            <div class="card-title collapsible" onclick="toggleCardCollapse('resultsCard')">
+                <span>Trade History</span>
+                <span class="collapse-icon">▼</span>
             </div>
-            
-            <div id="accountTabs" class="tabs"></div>
-            <div id="accountContents"></div>
+            <div class="card-content" id="resultsCardContent">
+                <!-- Column Selector -->
+                <div class="column-selector expanded" id="columnSelector">
+                    <div class="column-selector-header" onclick="toggleColumnSelector()">
+                        <span>Select Columns to Display/Export</span>
+                        <span id="toggleIcon">▼</span>
+                    </div>
+                    <div class="column-options" id="columnOptions"></div>
+                </div>
+                
+                <!-- Market Type Filter -->
+                <div class="type-filter" id="marketTypeFilter" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Filter by Market Type:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <label class="column-option active" onclick="toggleMarketType('Perp')">
+                            <input type="checkbox" checked onchange="toggleMarketType('Perp')" onclick="event.stopPropagation()">
+                            Perpetuals
+                        </label>
+                        <label class="column-option active" onclick="toggleMarketType('Spot')">
+                            <input type="checkbox" checked onchange="toggleMarketType('Spot')" onclick="event.stopPropagation()">
+                            Spot
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="accountTabs" class="tabs"></div>
+                <div id="accountContents"></div>
+            </div>
         </div>
 
         <!-- Funding Payments Results -->
         <div class="card hidden" id="fundingCard">
-            <div class="card-title">Funding Payments</div>
-            <div id="fundingTabs" class="tabs"></div>
-            <div id="fundingContents"></div>
+            <div class="card-title collapsible" onclick="toggleCardCollapse('fundingCard')">
+                <span>Funding Payments</span>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content" id="fundingCardContent">
+                <div id="fundingTabs" class="tabs"></div>
+                <div id="fundingContents"></div>
+            </div>
         </div>
 
         <!-- Deposits Results -->
         <div class="card hidden" id="depositsCard">
-            <div class="card-title">Deposits</div>
-            <div id="depositsTabs" class="tabs"></div>
-            <div id="depositsContents"></div>
+            <div class="card-title collapsible" onclick="toggleCardCollapse('depositsCard')">
+                <span>Deposits</span>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content" id="depositsCardContent">
+                <div id="depositsTabs" class="tabs"></div>
+                <div id="depositsContents"></div>
+            </div>
         </div>
 
         <!-- Transfers Results -->
         <div class="card hidden" id="transfersCard">
-            <div class="card-title">Transfers</div>
-            <!-- Type Filter -->
-            <div class="type-filter" id="transferTypeFilter" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Filter by Type:</div>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                    <label class="column-option active" onclick="toggleTransferType('L2TransferOutflow')">
-                        <input type="checkbox" checked onchange="toggleTransferType('L2TransferOutflow')" onclick="event.stopPropagation()">
-                        Outgoing Transfer
-                    </label>
-                    <label class="column-option active" onclick="toggleTransferType('L2TransferInflow')">
-                        <input type="checkbox" checked onchange="toggleTransferType('L2TransferInflow')" onclick="event.stopPropagation()">
-                        Incoming Transfer
-                    </label>
-                    <label class="column-option active" onclick="toggleTransferType('L2SelfTransfer')">
-                        <input type="checkbox" checked onchange="toggleTransferType('L2SelfTransfer')" onclick="event.stopPropagation()">
-                        Internal Transfer
-                    </label>
-                    <label class="column-option active" onclick="toggleTransferType('L2MintSharesOutflow')">
-                        <input type="checkbox" checked onchange="toggleTransferType('L2MintSharesOutflow')" onclick="event.stopPropagation()">
-                        Public Pool Mint
-                    </label>
-                    <label class="column-option active" onclick="toggleTransferType('L2BurnSharesInflow')">
-                        <input type="checkbox" checked onchange="toggleTransferType('L2BurnSharesInflow')" onclick="event.stopPropagation()">
-                        Public Pool Burn
-                    </label>
-                </div>
+            <div class="card-title collapsible" onclick="toggleCardCollapse('transfersCard')">
+                <span>Transfers</span>
+                <span class="collapse-icon">▼</span>
             </div>
-            <div id="transfersTabs" class="tabs"></div>
-            <div id="transfersContents"></div>
+            <div class="card-content" id="transfersCardContent">
+                <!-- Type Filter -->
+                <div class="type-filter" id="transferTypeFilter" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Filter by Type:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <label class="column-option active" onclick="toggleTransferType('L2TransferOutflow')">
+                            <input type="checkbox" checked onchange="toggleTransferType('L2TransferOutflow')" onclick="event.stopPropagation()">
+                            Outgoing Transfer
+                        </label>
+                        <label class="column-option active" onclick="toggleTransferType('L2TransferInflow')">
+                            <input type="checkbox" checked onchange="toggleTransferType('L2TransferInflow')" onclick="event.stopPropagation()">
+                            Incoming Transfer
+                        </label>
+                        <label class="column-option active" onclick="toggleTransferType('L2SelfTransfer')">
+                            <input type="checkbox" checked onchange="toggleTransferType('L2SelfTransfer')" onclick="event.stopPropagation()">
+                            Internal Transfer
+                        </label>
+                        <label class="column-option active" onclick="toggleTransferType('L2MintSharesOutflow')">
+                            <input type="checkbox" checked onchange="toggleTransferType('L2MintSharesOutflow')" onclick="event.stopPropagation()">
+                            Public Pool Mint
+                        </label>
+                        <label class="column-option active" onclick="toggleTransferType('L2BurnSharesInflow')">
+                            <input type="checkbox" checked onchange="toggleTransferType('L2BurnSharesInflow')" onclick="event.stopPropagation()">
+                            Public Pool Burn
+                        </label>
+                    </div>
+                </div>
+                <div id="transfersTabs" class="tabs"></div>
+                <div id="transfersContents"></div>
+            </div>
         </div>
 
         <!-- Withdrawals Results -->
         <div class="card hidden" id="withdrawalsCard">
-            <div class="card-title">Withdrawals</div>
-            <div id="withdrawalsTabs" class="tabs"></div>
-            <div id="withdrawalsContents"></div>
+            <div class="card-title collapsible" onclick="toggleCardCollapse('withdrawalsCard')">
+                <span>Withdrawals</span>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content" id="withdrawalsCardContent">
+                <div id="withdrawalsTabs" class="tabs"></div>
+                <div id="withdrawalsContents"></div>
+            </div>
         </div>
 
         <div class="security-note">
@@ -1042,6 +1364,9 @@
         let rawTradesData = {}; // { accountIndex: [raw trades from API] }
         let fundingData = {}; // { accountIndex: { fundings: [...], ... } }
         let rawFundingData = {}; // { accountIndex: [raw funding from API] }
+        let selectedTimeframe = 'complete'; // 'complete' or 'custom'
+        let customDateFrom = null; // Timestamp in ms
+        let customDateTo = null; // Timestamp in ms
         let depositsData = {}; // { accountIndex: { deposits: [...], ... } }
         let rawDepositsData = {}; // { accountIndex: [raw deposits from API] }
         let transfersData = {}; // { accountIndex: { transfers: [...], ... } }
@@ -1070,6 +1395,12 @@
             'L2MintSharesOutflow': true,
             'L2SelfTransfer': true,
             'L2TransferInflow': true
+        };
+        
+        // Market type filter state (all enabled by default)
+        let marketTypeFilters = {
+            'Perp': true,
+            'Spot': true
         };
         
         // Fetch asset details and cache them
@@ -1121,6 +1452,7 @@
             trade_id: { label: 'Trade ID', default: false },
             tx_hash: { label: 'Tx Hash', default: false },
             market: { label: 'Market', default: true },
+            market_type: { label: 'Type', default: true },
             side: { label: 'Side', default: true },
             datetime_utc: { label: 'Date/Time', default: true },
             trade_value_usd: { label: 'Value ($)', default: true },
@@ -1170,6 +1502,16 @@
             const icon = document.getElementById('toggleIcon');
             selector.classList.toggle('expanded');
             icon.textContent = selector.classList.contains('expanded') ? '▼' : '▶';
+        }
+        
+        // Toggle card collapse (for results sections)
+        function toggleCardCollapse(cardId) {
+            const card = document.getElementById(cardId);
+            const title = card.querySelector('.card-title');
+            const content = card.querySelector('.card-content');
+            
+            title.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
         }
         
         // Get list of visible columns
@@ -1311,13 +1653,127 @@
             });
         }
         
+        // Timeframe selector functions
+        function selectTimeframe(type) {
+            selectedTimeframe = type;
+            
+            // Update UI
+            document.querySelectorAll('.timeframe-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            
+            if (type === 'complete') {
+                document.getElementById('timeframeComplete').checked = true;
+                document.querySelector('.timeframe-option:nth-child(1)').classList.add('active');
+                document.getElementById('dateRangeInputs').classList.remove('visible');
+                document.getElementById('timeRangeInputs').classList.remove('visible');
+            } else {
+                document.getElementById('timeframeCustom').checked = true;
+                document.querySelector('.timeframe-option:nth-child(2)').classList.add('active');
+                document.getElementById('dateRangeInputs').classList.add('visible');
+                
+                // Set default dates if not already set
+                const dateFromInput = document.getElementById('dateFrom');
+                const dateToInput = document.getElementById('dateTo');
+                
+                if (!dateFromInput.value) {
+                    // Default: 1 year ago
+                    const oneYearAgo = new Date();
+                    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+                    dateFromInput.value = formatDateOnly(oneYearAgo);
+                }
+                
+                if (!dateToInput.value) {
+                    // Default: today
+                    dateToInput.value = formatDateOnly(new Date());
+                }
+            }
+        }
+        
+        function toggleHoursSelection() {
+            const checkbox = document.getElementById('includeHours');
+            const timeInputs = document.getElementById('timeRangeInputs');
+            
+            if (checkbox.checked) {
+                timeInputs.classList.add('visible');
+            } else {
+                timeInputs.classList.remove('visible');
+                // Reset to default times
+                document.getElementById('timeFrom').value = '00:00';
+                document.getElementById('timeTo').value = '23:59';
+            }
+        }
+        
+        function formatDateOnly(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function getTimeframeParams() {
+            if (selectedTimeframe === 'complete') {
+                return { fromTimestamp: null, toTimestamp: null };
+            }
+            
+            const dateFromInput = document.getElementById('dateFrom');
+            const dateToInput = document.getElementById('dateTo');
+            const includeHours = document.getElementById('includeHours').checked;
+            
+            if (!dateFromInput.value || !dateToInput.value) {
+                return { fromTimestamp: null, toTimestamp: null };
+            }
+            
+            let fromTimestamp, toTimestamp;
+            
+            if (includeHours) {
+                // Use specific times from time inputs (UTC to match API timestamps)
+                const timeFromInput = document.getElementById('timeFrom');
+                const timeToInput = document.getElementById('timeTo');
+                const timeFrom = timeFromInput.value || '00:00';
+                const timeTo = timeToInput.value || '23:59';
+                
+                fromTimestamp = new Date(`${dateFromInput.value}T${timeFrom}:00.000Z`).getTime();
+                toTimestamp = new Date(`${dateToInput.value}T${timeTo}:59.999Z`).getTime();
+            } else {
+                // Use start of day for from, end of day for to (UTC to match API timestamps)
+                fromTimestamp = new Date(`${dateFromInput.value}T00:00:00.000Z`).getTime();
+                toTimestamp = new Date(`${dateToInput.value}T23:59:59.999Z`).getTime();
+            }
+            
+            return { fromTimestamp, toTimestamp };
+        }
+        
+        function validateTimeframe() {
+            if (selectedTimeframe === 'complete') {
+                return true;
+            }
+            
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
+            
+            if (!fromTimestamp || !toTimestamp) {
+                showStatus('fetchStatus', 'Please select both start and end dates', 'error');
+                return false;
+            }
+            
+            if (fromTimestamp >= toTimestamp) {
+                showStatus('fetchStatus', 'Start date must be before end date', 'error');
+                return false;
+            }
+            
+            return true;
+        }
         
         // Fetch trades from Lighter API directly (client-side)
         // Uses headers for auth token (not visible in URL/console)
-        async function fetchTradesFromLighter(authToken, accountIndex) {
+        // Supports optional timeframe filtering via fromTimestamp (start) and toTimestamp (end) in ms
+        // NOTE: The API's 'from' parameter returns trades FROM that timestamp going BACKWARDS (older)
+        // So we set 'from' to toTimestamp (end date) and stop when we hit fromTimestamp (start date)
+        async function fetchTradesFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
             const allTrades = [];
             let cursor = null;
             let page = 0;
+            let reachedStart = false;
             
             while (true) {
                 page++;
@@ -1326,11 +1782,19 @@
                     sort_by: 'timestamp',
                     limit: 100
                 });
+                
+                // The 'from' parameter tells the API to start from this timestamp and go backwards
+                // So we use the END date (toTimestamp) as the starting point
+                if (toTimestamp && !cursor) {
+                    params.append('from', Math.floor(toTimestamp / 1000));
+                }
+                
                 if (cursor) {
                     params.append('cursor', cursor);
                 }
                 
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching page ${page}...`, 'loading');
+                const timeframeMsg = toTimestamp ? ' (filtered)' : '';
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching page ${page}${timeframeMsg}...`, 'loading');
                 
                 try {
                     const response = await fetch(`${LIGHTER_API}/api/v1/trades?${params}`, {
@@ -1354,11 +1818,26 @@
                         break;
                     }
                     
-                    const trades = data.trades || [];
+                    let trades = data.trades || [];
+                    
+                    // If we have a start timestamp (fromTimestamp), check if we should stop
+                    // Trades come in descending order (newest first), so we stop when we hit trades older than fromTimestamp
+                    if (fromTimestamp && trades.length > 0) {
+                        const filteredTrades = [];
+                        for (const trade of trades) {
+                            const tradeTime = trade.timestamp;
+                            if (tradeTime >= fromTimestamp) {
+                                filteredTrades.push(trade);
+                            } else {
+                                reachedStart = true;
+                            }
+                        }
+                        trades = filteredTrades;
+                    }
+                    
                     allTrades.push(...trades);
                     
-                    // Check for next page
-                    if (!data.next_cursor || trades.length === 0) {
+                    if (!data.next_cursor || trades.length === 0 || reachedStart) {
                         break;
                     }
                     
@@ -1371,6 +1850,16 @@
                     console.error(`Error fetching trades: ${error}`);
                     break;
                 }
+            }
+            
+            // Final filter to ensure all trades are within the timeframe
+            if (fromTimestamp || toTimestamp) {
+                return allTrades.filter(trade => {
+                    const tradeTime = trade.timestamp;
+                    const afterStart = fromTimestamp ? tradeTime >= fromTimestamp : true;
+                    const beforeEnd = toTimestamp ? tradeTime <= toTimestamp : true;
+                    return afterStart && beforeEnd;
+                });
             }
             
             return allTrades;
@@ -1388,6 +1877,13 @@
                 showStatus('fetchStatus', 'Please select at least one account', 'error');
                 return;
             }
+            
+            // Validate timeframe
+            if (!validateTimeframe()) {
+                return;
+            }
+            
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
 
             const btn = document.getElementById('fetchTradesBtn');
             setAllFetchButtonsDisabled(true);
@@ -1399,8 +1895,8 @@
                 rawTradesData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    // Fetch raw trades from Lighter
-                    const rawTrades = await fetchTradesFromLighter(readOnlyToken, accountIndex);
+                    // Fetch raw trades from Lighter with optional timeframe
+                    const rawTrades = await fetchTradesFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
                     
                     // Store raw trades for JSON export
                     rawTradesData[accountIndex] = rawTrades;
@@ -1490,9 +1986,12 @@
                 } else {
                     const safeAccountIndex = parseInt(accountIndex, 10);
                     const safeTotal = parseInt(accountData.total_trades, 10) || 0;
+                    const filteredTrades = getFilteredTrades(accountData.trades);
+                    const displayCount = filteredTrades.length;
+                    const statsText = displayCount === safeTotal ? `${safeTotal} trades` : `${displayCount} of ${safeTotal} trades`;
                     content.innerHTML = `
                         <div class="results-header">
-                            <span class="results-stats">${safeTotal} trades</span>
+                            <span class="results-stats">${statsText}</span>
                             <div style="display: flex; gap: 8px;">
                                 <button class="btn-secondary btn-small" onclick="exportCSV(${safeAccountIndex})">
                                     CSV
@@ -1503,7 +2002,7 @@
                             </div>
                         </div>
                         <div class="results-box">
-                            ${buildTradesTable(accountData.trades, visibleCols)}
+                            ${buildTradesTable(filteredTrades, visibleCols)}
                         </div>
                     `;
                 }
@@ -1545,6 +2044,9 @@
             switch(col) {
                 case 'market':
                     return `<span class="trade-market">${escapeHtml(value)}</span>`;
+                case 'market_type':
+                    const typeClass = value === 'Spot' ? 'type-spot' : 'type-perp';
+                    return `<span class="market-type ${typeClass}">${escapeHtml(value)}</span>`;
                 case 'side':
                     const safeValue = escapeHtml(value);
                     // Green for buy actions: Open Long, Increase Long, Close Short, Reduce Short, Short > Long
@@ -1566,9 +2068,12 @@
                     const sign = pnlVal >= 0 ? '+' : '';
                     return `<span class="trade-pnl ${pnlClass}">${sign}$${pnlVal.toFixed(2)}</span>`;
                 case 'tx_hash':
+                    if (!value) return '<span class="tx-hash">N/A</span>';
                     const safeHash = escapeHtml(value);
                     const shortHash = String(value).substring(0, 16);
-                    return `<span class="tx-hash" title="${safeHash}">${escapeHtml(shortHash)}...</span>`;
+                    return `<span class="copyable" data-copy="${safeHash}" onclick="copyToClipboard(this)" title="Click to copy full hash">
+                        <span class="tx-hash">${escapeHtml(shortHash)}...</span>${COPY_ICON_SVG}
+                    </span>`;
                 case 'trade_id':
                     return escapeHtml(parseInt(value, 10) || value);
                 case 'size':
@@ -1598,7 +2103,11 @@
                 return;
             }
 
-            const trades = accountData.trades;
+            const trades = getFilteredTrades(accountData.trades);
+            if (trades.length === 0) {
+                alert('No trades match the current filters');
+                return;
+            }
             const visibleCols = getVisibleColumns();
             
             if (visibleCols.length === 0) {
@@ -1683,10 +2192,18 @@
         // ===== FUNDING PAYMENTS =====
         
         // Fetch funding from Lighter API
-        async function fetchFundingFromLighter(authToken, accountIndex) {
+        // For funding, there's no 'from' parameter, so we fetch from the beginning and filter
+        // Funding API: data comes in descending order (newest first)
+        // We fetch from the beginning and stop when we hit events older than fromTimestamp (start date)
+        async function fetchFundingFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
             const allFundings = [];
             let cursor = null;
             let page = 0;
+            let reachedStart = false;
+            
+            // Convert to seconds for funding API (uses seconds, not ms)
+            const fromSec = fromTimestamp ? Math.floor(fromTimestamp / 1000) : null;
+            const toSec = toTimestamp ? Math.floor(toTimestamp / 1000) : null;
             
             while (true) {
                 page++;
@@ -1698,7 +2215,8 @@
                     params.append('cursor', cursor);
                 }
                 
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching funding page ${page}...`, 'loading');
+                const timeframeMsg = fromTimestamp ? ' (filtered)' : '';
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching funding page ${page}${timeframeMsg}...`, 'loading');
                 
                 try {
                     const response = await fetch(`${LIGHTER_API}/api/v1/positionFunding?${params}`, {
@@ -1722,10 +2240,27 @@
                         break;
                     }
                     
-                    const fundings = data.position_fundings || [];
+                    let fundings = data.position_fundings || [];
+                    
+                    // Data comes in descending order (newest first)
+                    // If we have a start timestamp, stop when we hit events older than it
+                    if (fromSec && fundings.length > 0) {
+                        const filteredFundings = [];
+                        for (const funding of fundings) {
+                            if (funding.timestamp >= fromSec) {
+                                // Event is within range (newer than or equal to start date)
+                                filteredFundings.push(funding);
+                            } else {
+                                // Event is older than start date - stop fetching
+                                reachedStart = true;
+                            }
+                        }
+                        fundings = filteredFundings;
+                    }
+                    
                     allFundings.push(...fundings);
                     
-                    if (!data.next_cursor || fundings.length === 0) {
+                    if (!data.next_cursor || fundings.length === 0 || reachedStart) {
                         break;
                     }
                     
@@ -1736,6 +2271,15 @@
                     console.error(`Error fetching funding: ${error}`);
                     break;
                 }
+            }
+            
+            // Final filter to ensure all fundings are within the timeframe
+            if (fromSec || toSec) {
+                return allFundings.filter(funding => {
+                    const afterStart = fromSec ? funding.timestamp >= fromSec : true;
+                    const beforeEnd = toSec ? funding.timestamp <= toSec : true;
+                    return afterStart && beforeEnd;
+                });
             }
             
             return allFundings;
@@ -1754,6 +2298,13 @@
                 return;
             }
             
+            // Validate timeframe
+            if (!validateTimeframe()) {
+                return;
+            }
+            
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
+            
             const btn = document.getElementById('fetchFundingBtn');
             setAllFetchButtonsDisabled(true);
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
@@ -1763,7 +2314,7 @@
                 rawFundingData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    const rawFundings = await fetchFundingFromLighter(readOnlyToken, accountIndex);
+                    const rawFundings = await fetchFundingFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
                     rawFundingData[accountIndex] = rawFundings;
                     
                     // Process funding data
@@ -1989,10 +2540,14 @@
         }
         
         // Fetch deposits from Lighter API
-        async function fetchDepositsFromLighter(authToken, accountIndex) {
+        // Deposits timestamp is in milliseconds
+        // Deposits API: data comes in descending order (newest first)
+        // We fetch from the beginning and stop when we hit events older than fromTimestamp (start date)
+        async function fetchDepositsFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
             const allDeposits = [];
             let cursor = null;
             let page = 0;
+            let reachedStart = false;
             const l1Address = getL1Address();
             
             while (true) {
@@ -2005,7 +2560,8 @@
                     params.append('cursor', cursor);
                 }
                 
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching deposits page ${page}...`, 'loading');
+                const timeframeMsg = fromTimestamp ? ' (filtered)' : '';
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching deposits page ${page}${timeframeMsg}...`, 'loading');
                 
                 try {
                     const response = await fetch(`${LIGHTER_API}/api/v1/deposit/history?${params}`, {
@@ -2029,10 +2585,27 @@
                         break;
                     }
                     
-                    const deposits = data.deposits || [];
+                    let deposits = data.deposits || [];
+                    
+                    // Data comes in descending order (newest first)
+                    // If we have a start timestamp, stop when we hit events older than it
+                    if (fromTimestamp && deposits.length > 0) {
+                        const filteredDeposits = [];
+                        for (const deposit of deposits) {
+                            if (deposit.timestamp >= fromTimestamp) {
+                                // Event is within range (newer than or equal to start date)
+                                filteredDeposits.push(deposit);
+                            } else {
+                                // Event is older than start date - stop fetching
+                                reachedStart = true;
+                            }
+                        }
+                        deposits = filteredDeposits;
+                    }
+                    
                     allDeposits.push(...deposits);
                     
-                    if (!data.cursor || deposits.length === 0) {
+                    if (!data.cursor || deposits.length === 0 || reachedStart) {
                         break;
                     }
                     
@@ -2043,6 +2616,15 @@
                     console.error(`Error fetching deposits: ${error}`);
                     break;
                 }
+            }
+            
+            // Final filter to ensure all deposits are within the timeframe
+            if (fromTimestamp || toTimestamp) {
+                return allDeposits.filter(deposit => {
+                    const afterStart = fromTimestamp ? deposit.timestamp >= fromTimestamp : true;
+                    const beforeEnd = toTimestamp ? deposit.timestamp <= toTimestamp : true;
+                    return afterStart && beforeEnd;
+                });
             }
             
             return allDeposits;
@@ -2061,6 +2643,13 @@
                 return;
             }
             
+            // Validate timeframe
+            if (!validateTimeframe()) {
+                return;
+            }
+            
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
+            
             const btn = document.getElementById('fetchDepositsBtn');
             setAllFetchButtonsDisabled(true);
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
@@ -2073,7 +2662,7 @@
                 rawDepositsData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    const rawDeposits = await fetchDepositsFromLighter(readOnlyToken, accountIndex);
+                    const rawDeposits = await fetchDepositsFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
                     rawDepositsData[accountIndex] = rawDeposits;
                     
                     // Process deposits
@@ -2311,11 +2900,48 @@
             }
         }
         
+        // Toggle market type filter (Spot/Perp)
+        function toggleMarketType(type) {
+            marketTypeFilters[type] = !marketTypeFilters[type];
+            
+            // Update UI checkbox state
+            const filterContainer = document.getElementById('marketTypeFilter');
+            const labels = filterContainer.querySelectorAll('.column-option');
+            labels.forEach(label => {
+                const checkbox = label.querySelector('input');
+                const labelText = label.textContent.trim();
+                const typeKey = labelText === 'Perpetuals' ? 'Perp' : 'Spot';
+                if ((type === 'Perp' && labelText === 'Perpetuals') || (type === 'Spot' && labelText === 'Spot')) {
+                    const isActive = marketTypeFilters[type];
+                    checkbox.checked = isActive;
+                    if (isActive) {
+                        label.classList.add('active');
+                    } else {
+                        label.classList.remove('active');
+                    }
+                }
+            });
+            
+            // Re-render if we have data
+            if (Object.keys(fetchedData).length > 0) {
+                displayResults();
+            }
+        }
+        
+        // Get filtered trades based on market type filters
+        function getFilteredTrades(trades) {
+            return trades.filter(t => marketTypeFilters[t.market_type]);
+        }
+        
         // Fetch transfers from Lighter API
-        async function fetchTransfersFromLighter(authToken, accountIndex) {
+        // Transfers timestamp is in milliseconds
+        // Transfers API: data comes in descending order (newest first)
+        // We fetch from the beginning and stop when we hit events older than fromTimestamp (start date)
+        async function fetchTransfersFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
             const allTransfers = [];
             let cursor = null;
             let page = 0;
+            let reachedStart = false;
             
             while (true) {
                 page++;
@@ -2326,7 +2952,8 @@
                     params.append('cursor', cursor);
                 }
                 
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching transfers page ${page}...`, 'loading');
+                const timeframeMsg = fromTimestamp ? ' (filtered)' : '';
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching transfers page ${page}${timeframeMsg}...`, 'loading');
                 
                 try {
                     const response = await fetch(`${LIGHTER_API}/api/v1/transfer/history?${params}`, {
@@ -2350,10 +2977,27 @@
                         break;
                     }
                     
-                    const transfers = data.transfers || [];
+                    let transfers = data.transfers || [];
+                    
+                    // Data comes in descending order (newest first)
+                    // If we have a start timestamp, stop when we hit events older than it
+                    if (fromTimestamp && transfers.length > 0) {
+                        const filteredTransfers = [];
+                        for (const transfer of transfers) {
+                            if (transfer.timestamp >= fromTimestamp) {
+                                // Event is within range (newer than or equal to start date)
+                                filteredTransfers.push(transfer);
+                            } else {
+                                // Event is older than start date - stop fetching
+                                reachedStart = true;
+                            }
+                        }
+                        transfers = filteredTransfers;
+                    }
+                    
                     allTransfers.push(...transfers);
                     
-                    if (!data.cursor || transfers.length === 0) {
+                    if (!data.cursor || transfers.length === 0 || reachedStart) {
                         break;
                     }
                     
@@ -2364,6 +3008,15 @@
                     console.error(`Error fetching transfers: ${error}`);
                     break;
                 }
+            }
+            
+            // Final filter to ensure all transfers are within the timeframe
+            if (fromTimestamp || toTimestamp) {
+                return allTransfers.filter(transfer => {
+                    const afterStart = fromTimestamp ? transfer.timestamp >= fromTimestamp : true;
+                    const beforeEnd = toTimestamp ? transfer.timestamp <= toTimestamp : true;
+                    return afterStart && beforeEnd;
+                });
             }
             
             return allTransfers;
@@ -2382,6 +3035,13 @@
                 return;
             }
             
+            // Validate timeframe
+            if (!validateTimeframe()) {
+                return;
+            }
+            
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
+            
             const btn = document.getElementById('fetchTransfersBtn');
             setAllFetchButtonsDisabled(true);
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
@@ -2394,7 +3054,7 @@
                 rawTransfersData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    const rawTransfers = await fetchTransfersFromLighter(readOnlyToken, accountIndex);
+                    const rawTransfers = await fetchTransfersFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
                     rawTransfersData[accountIndex] = rawTransfers;
                     
                     // Process transfers
@@ -2663,10 +3323,14 @@
         // ===== WITHDRAWALS =====
         
         // Fetch withdrawals from Lighter API
-        async function fetchWithdrawalsFromLighter(authToken, accountIndex) {
+        // Withdrawals timestamp is in milliseconds
+        // Withdrawals API: data comes in descending order (newest first)
+        // We fetch from the beginning and stop when we hit events older than fromTimestamp (start date)
+        async function fetchWithdrawalsFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
             const allWithdrawals = [];
             let cursor = null;
             let page = 0;
+            let reachedStart = false;
             
             while (true) {
                 page++;
@@ -2677,7 +3341,8 @@
                     params.append('cursor', cursor);
                 }
                 
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching withdrawals page ${page}...`, 'loading');
+                const timeframeMsg = fromTimestamp ? ' (filtered)' : '';
+                showStatus('fetchStatus', `Account #${accountIndex}: Fetching withdrawals page ${page}${timeframeMsg}...`, 'loading');
                 
                 try {
                     const response = await fetch(`${LIGHTER_API}/api/v1/withdraw/history?${params}`, {
@@ -2701,10 +3366,27 @@
                         break;
                     }
                     
-                    const withdrawals = data.withdraws || [];
+                    let withdrawals = data.withdraws || [];
+                    
+                    // Data comes in descending order (newest first)
+                    // If we have a start timestamp, stop when we hit events older than it
+                    if (fromTimestamp && withdrawals.length > 0) {
+                        const filteredWithdrawals = [];
+                        for (const withdrawal of withdrawals) {
+                            if (withdrawal.timestamp >= fromTimestamp) {
+                                // Event is within range (newer than or equal to start date)
+                                filteredWithdrawals.push(withdrawal);
+                            } else {
+                                // Event is older than start date - stop fetching
+                                reachedStart = true;
+                            }
+                        }
+                        withdrawals = filteredWithdrawals;
+                    }
+                    
                     allWithdrawals.push(...withdrawals);
                     
-                    if (!data.cursor || withdrawals.length === 0) {
+                    if (!data.cursor || withdrawals.length === 0 || reachedStart) {
                         break;
                     }
                     
@@ -2715,6 +3397,15 @@
                     console.error(`Error fetching withdrawals: ${error}`);
                     break;
                 }
+            }
+            
+            // Final filter to ensure all withdrawals are within the timeframe
+            if (fromTimestamp || toTimestamp) {
+                return allWithdrawals.filter(withdrawal => {
+                    const afterStart = fromTimestamp ? withdrawal.timestamp >= fromTimestamp : true;
+                    const beforeEnd = toTimestamp ? withdrawal.timestamp <= toTimestamp : true;
+                    return afterStart && beforeEnd;
+                });
             }
             
             return allWithdrawals;
@@ -2733,6 +3424,13 @@
                 return;
             }
             
+            // Validate timeframe
+            if (!validateTimeframe()) {
+                return;
+            }
+            
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
+            
             const btn = document.getElementById('fetchWithdrawalsBtn');
             setAllFetchButtonsDisabled(true);
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
@@ -2745,7 +3443,7 @@
                 rawWithdrawalsData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    const rawWithdrawals = await fetchWithdrawalsFromLighter(readOnlyToken, accountIndex);
+                    const rawWithdrawals = await fetchWithdrawalsFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
                     rawWithdrawalsData[accountIndex] = rawWithdrawals;
                     
                     // Process withdrawals

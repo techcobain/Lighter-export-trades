@@ -2,14 +2,12 @@
 Lighter Trades Fetcher - Fetch and export trading history from Lighter exchange.
 """
 
-import asyncio
 import re
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from collections import defaultdict
 import httpx
-import lighter
 from eth_utils.address import to_checksum_address
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +22,6 @@ RATE_LIMIT_DELAY = 3.5
 RATE_LIMIT_RETRY_DELAY = 15
 
 ENDPOINT_RATE_LIMITS = {
-    "/api/generate-auth": {"requests": 10, "window": 60},
     "/api/lookup-accounts": {"requests": 20, "window": 60},
     "/api/process-trades": {"requests": 30, "window": 60},
 }
@@ -94,19 +91,8 @@ MARKET_CACHE_TTL = 3600
 
 
 # Models
-class AccountCredentials(BaseModel):
-    account_index: int
-    private_key: str
-    api_key_index: int
-
-
 class LookupAccountsRequest(BaseModel):
     l1_address: str
-
-
-class GenerateAuthRequest(BaseModel):
-    accounts: list[AccountCredentials]
-    extended_auth: bool = False
 
 
 class ProcessTradesRequest(BaseModel):
@@ -118,6 +104,7 @@ class TradeData(BaseModel):
     trade_id: int
     tx_hash: str
     market: str
+    market_type: str  # "Perp" or "Spot"
     side: str
     datetime_utc: str
     trade_value_usd: float
@@ -150,15 +137,27 @@ async def fetch_market_details() -> dict:
     if market_cache["data"] and (current_time - market_cache["last_updated"]) < MARKET_CACHE_TTL:
         return market_cache["data"]
     
+    market_map = {}
     async with httpx.AsyncClient() as client:
+        # Fetch order book details (contains both perp and spot markets in separate arrays)
         response = await client.get(f"{BASE_URL}/api/v1/orderBookDetails")
         if response.status_code == 200:
             data = response.json()
-            market_map = {book["market_id"]: book["symbol"] for book in data.get("order_book_details", [])}
-            market_cache["data"] = market_map
-            market_cache["last_updated"] = current_time
-            return market_map
-    return market_cache["data"]
+            # Perp markets are in "order_book_details"
+            for book in data.get("order_book_details", []):
+                market_id = int(book["market_id"])
+                if "symbol" in book:
+                    market_map[market_id] = book["symbol"]
+            # Spot markets are in "spot_order_book_details"
+            for book in data.get("spot_order_book_details", []):
+                market_id = int(book["market_id"])
+                if "symbol" in book:
+                    market_map[market_id] = book["symbol"]
+    
+    if market_map:
+        market_cache["data"] = market_map
+        market_cache["last_updated"] = current_time
+    return market_cache["data"] if market_cache["data"] else market_map
 
 
 async def get_account_indexes(l1_address: str) -> list[int]:
@@ -171,35 +170,6 @@ async def get_account_indexes(l1_address: str) -> list[int]:
         if data.get("code") != 200:
             raise HTTPException(status_code=400, detail="Invalid address or API error")
         return [acc["index"] for acc in data.get("sub_accounts", [])]
-
-
-async def create_auth_token(private_key: str, account_index: int, api_key_index: int, deadline: int = -1) -> str:
-    """Generate auth token using Lighter SDK."""
-    client = None
-    try:
-        client = lighter.SignerClient(
-            url=BASE_URL,
-            account_index=account_index,
-            api_private_keys={api_key_index: private_key},
-        )
-        err = client.check_client()
-        if err:
-            raise HTTPException(status_code=400, detail="Client verification failed")
-        
-        auth_token, err = client.create_auth_token_with_expiry(deadline=deadline, api_key_index=api_key_index)
-        if err:
-            raise HTTPException(status_code=400, detail="Auth token creation failed")
-        return auth_token
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
-    finally:
-        if client:
-            try:
-                await client.close()
-            except:
-                pass
 
 
 def is_user_taker(trade: dict, account_index: int) -> bool:
@@ -253,9 +223,20 @@ def calculate_fee_usd(trade: dict, account_index: int, price: float, size: float
 
 def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeData:
     """Process raw trade into display format."""
-    market_id = trade.get("market_id", 0)
+    market_id = int(trade.get("market_id", 0))
     size = float(trade.get("size", 0))
     price = float(trade.get("price", 0))
+    
+    # Determine market type: Spot (market_id >= 2048) or Perp
+    is_spot = market_id >= 2048
+    market_type = "Spot" if is_spot else "Perp"
+    
+    # Get market symbol and normalize for spot markets (ETH/USDC -> ETH)
+    raw_symbol = market_map.get(market_id, f"ID:{market_id}")
+    if is_spot and "/" in raw_symbol:
+        market_symbol = raw_symbol.split("/")[0]
+    else:
+        market_symbol = raw_symbol
     
     is_taker = is_user_taker(trade, account_index)
     is_buyer = trade.get("bid_account_id") == account_index
@@ -287,7 +268,8 @@ def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeDat
     return TradeData(
         trade_id=trade.get("trade_id", 0),
         tx_hash=trade.get("tx_hash", ""),
-        market=market_map.get(market_id, f"ID:{market_id}"),
+        market=market_symbol,
+        market_type=market_type,
         side=determine_side(trade, account_index),
         datetime_utc=dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
         trade_value_usd=round(float(trade.get("usd_amount", 0)), 2),
@@ -313,34 +295,6 @@ async def lookup_accounts(request: LookupAccountsRequest):
     if not account_indexes:
         raise HTTPException(status_code=400, detail="No accounts found for this address")
     return {"success": True, "l1_address": checksummed_address, "account_indexes": account_indexes}
-
-
-@app.post("/api/generate-auth")
-async def generate_auth(request: GenerateAuthRequest):
-    """Generate auth tokens for accounts."""
-    if not request.accounts:
-        raise HTTPException(status_code=400, detail="No accounts provided")
-    if len(request.accounts) > 10:
-        raise HTTPException(status_code=400, detail="Maximum 10 accounts per request")
-    
-    deadline = 3600 if request.extended_auth else -1
-    results = {}
-    
-    for account in request.accounts:
-        if account.account_index < 0:
-            results[account.account_index] = {"success": False, "error": "Invalid account index"}
-            continue
-        try:
-            auth_token = await create_auth_token(
-                account.private_key, account.account_index, account.api_key_index, deadline
-            )
-            results[account.account_index] = {"success": True, "auth_token": auth_token}
-        except HTTPException as e:
-            results[account.account_index] = {"success": False, "error": e.detail}
-        except Exception:
-            results[account.account_index] = {"success": False, "error": "Authentication failed"}
-    
-    return {"success": True, "accounts": results}
 
 
 @app.post("/api/process-trades")
