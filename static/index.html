@@ -3,12 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
     <title>Lighter Trades Fetcher</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('lighter-theme') === 'light') {
+                    document.documentElement.dataset.theme = 'light';
+                }
+            } catch (error) {}
+        })();
+    </script>
     <style>
         :root {
+            color-scheme: dark;
             --bg-primary: #0a0a0f;
             --bg-secondary: #12121a;
             --bg-tertiary: #1a1a25;
@@ -24,6 +35,49 @@
             --warning: #f59e0b;
             --bid-color: #4a7c59;
             --ask-color: #8a5a5a;
+            --panel-gradient: linear-gradient(
+                135deg,
+                rgba(26, 26, 37, 0.95) 0%,
+                rgba(18, 18, 26, 0.98) 100%
+            );
+            --page-glow-primary: rgba(74, 106, 154, 0.03);
+            --page-glow-secondary: rgba(90, 173, 105, 0.02);
+            --hover-bg: rgba(255, 255, 255, 0.02);
+            --row-border: rgba(42, 42, 53, 0.5);
+            --tooltip-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --calendar-icon-filter: invert(0.6);
+            --selection-text: #f0f0f5;
+        }
+
+        :root[data-theme="light"] {
+            color-scheme: light;
+            --bg-primary: #f5f7fb;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #eef2f7;
+            --text-primary: #172033;
+            --text-secondary: #4b5568;
+            --text-muted: #737f93;
+            --border: #d7deea;
+            --accent: #315f9d;
+            --accent-dim: #254a7f;
+            --accent-alt: #258b57;
+            --error: #c63d3d;
+            --success: #258b57;
+            --warning: #b7791f;
+            --bid-color: #24744a;
+            --ask-color: #b45256;
+            --panel-gradient: linear-gradient(
+                135deg,
+                rgba(255, 255, 255, 0.98) 0%,
+                rgba(246, 248, 252, 0.96) 100%
+            );
+            --page-glow-primary: rgba(49, 95, 157, 0.09);
+            --page-glow-secondary: rgba(37, 139, 87, 0.06);
+            --hover-bg: rgba(49, 95, 157, 0.06);
+            --row-border: rgba(215, 222, 234, 0.72);
+            --tooltip-shadow: 0 10px 28px rgba(23, 32, 51, 0.16);
+            --calendar-icon-filter: invert(0.35);
+            --selection-text: #ffffff;
         }
 
         * {
@@ -38,6 +92,7 @@
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+            transition: background 0.2s ease, color 0.2s ease;
         }
 
         /* Background gradient blurs */
@@ -56,7 +111,7 @@
             left: 15%;
             width: 400px;
             height: 400px;
-            background: rgba(74, 106, 154, 0.03);
+            background: var(--page-glow-primary);
             border-radius: 50%;
             filter: blur(80px);
         }
@@ -68,18 +123,14 @@
             right: 10%;
             width: 350px;
             height: 350px;
-            background: rgba(90, 173, 105, 0.02);
+            background: var(--page-glow-secondary);
             border-radius: 50%;
             filter: blur(80px);
         }
 
         /* Glass panel design */
         .glass-panel {
-            background: linear-gradient(
-                135deg,
-                rgba(26, 26, 37, 0.95) 0%,
-                rgba(18, 18, 26, 0.98) 100%
-            );
+            background: var(--panel-gradient);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--border);
@@ -104,6 +155,10 @@
 
         header {
             margin-bottom: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
         }
 
         h1 {
@@ -126,12 +181,63 @@
             font-weight: 400;
         }
 
+        .theme-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 32px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            user-select: none;
+        }
+
+        .theme-switch input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .theme-switch-track {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .theme-switch-track:hover {
+            border-color: var(--text-muted);
+        }
+
+        .theme-switch-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .theme-switch input:checked + .theme-switch-track {
+            background: rgba(49, 95, 157, 0.12);
+            border-color: rgba(49, 95, 157, 0.42);
+        }
+
+        .theme-switch input:checked + .theme-switch-track .theme-switch-thumb {
+            transform: translateX(20px);
+            background: var(--accent);
+        }
+
         .card {
-            background: linear-gradient(
-                135deg,
-                rgba(26, 26, 37, 0.95) 0%,
-                rgba(18, 18, 26, 0.98) 100%
-            );
+            background: var(--panel-gradient);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--border);
@@ -162,7 +268,7 @@
         }
 
         .card-title.collapsible:hover {
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--hover-bg);
         }
 
         .card-title .collapse-icon {
@@ -231,6 +337,11 @@
         @media (max-width: 600px) {
             .form-row {
                 grid-template-columns: 1fr;
+            }
+
+            header {
+                align-items: flex-start;
+                flex-direction: column;
             }
         }
 
@@ -607,7 +718,7 @@
         .date-input-group input[type="datetime-local"]::-webkit-calendar-picker-indicator,
         .date-input-group input[type="date"]::-webkit-calendar-picker-indicator,
         .date-input-group input[type="time"]::-webkit-calendar-picker-indicator {
-            filter: invert(0.6);
+            filter: var(--calendar-icon-filter);
             cursor: pointer;
         }
 
@@ -750,13 +861,13 @@
 
         .trades-table td {
             padding: 8px 12px;
-            border-bottom: 1px solid rgba(42, 42, 53, 0.5);
+            border-bottom: 1px solid var(--row-border);
             white-space: nowrap;
             color: var(--text-secondary);
         }
 
         .trades-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--hover-bg);
         }
 
         .trade-market {
@@ -885,7 +996,7 @@
             margin-top: 4px;
             line-height: 1.4;
             color: var(--text-muted);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            box-shadow: var(--tooltip-shadow);
         }
 
         .info-tooltip a {
@@ -965,7 +1076,7 @@
         /* Selection */
         ::selection {
             background: var(--accent);
-            color: var(--text-primary);
+            color: var(--selection-text);
         }
 
         .hidden {
@@ -985,11 +1096,7 @@
         }
 
         .faq-container {
-            background: linear-gradient(
-                135deg,
-                rgba(26, 26, 37, 0.95) 0%,
-                rgba(18, 18, 26, 0.98) 100%
-            );
+            background: var(--panel-gradient);
             border: 1px solid var(--border);
             border-radius: 4px;
             overflow: hidden;
@@ -1008,7 +1115,7 @@
         }
 
         .faq-main-toggle:hover {
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--hover-bg);
         }
 
         .faq-items {
@@ -1050,7 +1157,7 @@
         }
 
         .faq-question:hover {
-            background: rgba(255,255,255,0.02);
+            background: var(--hover-bg);
             color: var(--text-primary);
         }
 
@@ -1120,8 +1227,18 @@
     <div class="bg-gradients"></div>
     <div class="container">
         <header>
-            <h1><span>LIGHTER</span> EXPORT TRADING DATA</h1>
-            <p class="subtitle">Fetch trades, funding, deposits, transfers, and withdrawals</p>
+            <div>
+                <h1><span>LIGHTER</span> EXPORT TRADING DATA</h1>
+                <p class="subtitle">Fetch trades, funding, deposits, transfers, and withdrawals</p>
+            </div>
+            <label class="theme-switch" for="themeToggle">
+                <span>Dark</span>
+                <input type="checkbox" id="themeToggle" onchange="setThemeFromToggle(this.checked)" aria-label="Use light mode">
+                <span class="theme-switch-track">
+                    <span class="theme-switch-thumb"></span>
+                </span>
+                <span>Light</span>
+            </label>
         </header>
 
         <!-- FAQ Section -->
@@ -1518,6 +1635,32 @@
         let rawTransfersData = {}; // { accountIndex: [raw transfers from API] }
         let withdrawalsData = {}; // { accountIndex: { withdrawals: [...], ... } }
         let rawWithdrawalsData = {}; // { accountIndex: [raw withdrawals from API] }
+        const THEME_STORAGE_KEY = 'lighter-theme';
+
+        function applyTheme(theme) {
+            const normalizedTheme = theme === 'light' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = normalizedTheme;
+            const toggle = document.getElementById('themeToggle');
+            if (toggle) {
+                toggle.checked = normalizedTheme === 'light';
+            }
+        }
+
+        function setThemeFromToggle(isLight) {
+            const theme = isLight ? 'light' : 'dark';
+            applyTheme(theme);
+            try {
+                localStorage.setItem(THEME_STORAGE_KEY, theme);
+            } catch (error) {}
+        }
+
+        function initTheme() {
+            let savedTheme = 'dark';
+            try {
+                savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+            } catch (error) {}
+            applyTheme(savedTheme);
+        }
         
         // Asset cache for mapping asset_id to symbol
         let assetCache = {};
@@ -3796,6 +3939,7 @@
         }
         
         // Initialize on page load
+        initTheme();
         initColumnSelection();
     </script>
 </body>
