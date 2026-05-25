@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark light">
+    <meta name="color-scheme" content="light dark">
     <title>Lighter Trades Fetcher</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,8 +11,8 @@
     <script>
         (function () {
             try {
-                if (localStorage.getItem('lighter-theme') === 'light') {
-                    document.documentElement.dataset.theme = 'light';
+                if (localStorage.getItem('lighter-theme') === 'dark') {
+                    document.documentElement.dataset.theme = 'dark';
                 }
             } catch (error) {}
         })();
@@ -1655,9 +1655,9 @@
         }
 
         function initTheme() {
-            let savedTheme = 'dark';
+            let savedTheme = 'light';
             try {
-                savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+                savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
             } catch (error) {}
             applyTheme(savedTheme);
         }
