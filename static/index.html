@@ -1283,7 +1283,7 @@
                         </div>
                         <div class="faq-answer">
                             <div class="faq-answer-content">
-                                To avoid rate limits on the platform, we fetch ~1.7K trades per minute and ~3.6K funding payments per minute. 
+                                Trades are fetched in bulk exports, with large histories split into date ranges automatically. Funding is fetched at ~3.6K payments per minute.
                                 You should close the Lighter front-end while using this app or you risk getting rate limited. 
                             </div>
                         </div>
@@ -1297,7 +1297,7 @@
                         <div class="faq-answer">
                             <div class="faq-answer-content">
                                 You will see the output here in the app, with the option to also download it in a CSV file, or a JSON file 
-                                (this will be the raw JSON we fetched from the Lighter servers). Furthermore, you can customize the fields to see and export.
+                                (for trades, this contains the raw rows from Lighter’s export). Furthermore, you can customize the fields to see and export.
                             </div>
                         </div>
                     </div>
@@ -1559,6 +1559,7 @@
         </div>
     </div>
 
+    <script src="/static/trade-export.js"></script>
     <script>
         // ===== SECURITY: HTML Escaping to prevent XSS =====
         function escapeHtml(unsafe) {
@@ -1929,7 +1930,6 @@
 
         // Lighter API base URL
         const LIGHTER_API = 'https://mainnet.zklighter.elliot.ai';
-        const RATE_LIMIT_DELAY = 3500; // 3.5s between trade calls (20/min limit)
         const FUNDING_RATE_LIMIT_DELAY = 1000; // 1s between funding calls (60/min limit)
         const WALLET_RATE_LIMIT_DELAY = 1000; // 1s between wallet calls (60/min limit)
         
@@ -2052,105 +2052,12 @@
             return true;
         }
         
-        // Fetch trades from Lighter API directly (client-side)
-        // Uses headers for auth token (not visible in URL/console)
-        // Supports optional timeframe filtering via fromTimestamp (start) and toTimestamp (end) in ms
-        // NOTE: The API's 'from' parameter returns trades FROM that timestamp going BACKWARDS (older)
-        // So we set 'from' to toTimestamp (end date) and stop when we hit fromTimestamp (start date)
+        // Request exports in the browser; the server downloads and maps the CSV.
         async function fetchTradesFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
-            const allTrades = [];
-            let cursor = null;
-            let page = 0;
-            let reachedStart = false;
-            
-            while (true) {
-                page++;
-                const params = new URLSearchParams({
-                    account_index: accountIndex,
-                    sort_by: 'timestamp',
-                    limit: 100
-                });
-                
-                // The 'from' parameter tells the API to start from this timestamp and go backwards
-                // So we use the END date (toTimestamp) as the starting point
-                if (toTimestamp && !cursor) {
-                    params.append('from', Math.floor(toTimestamp / 1000));
-                }
-                
-                if (cursor) {
-                    params.append('cursor', cursor);
-                }
-                
-                const timeframeMsg = toTimestamp ? ' (filtered)' : '';
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching page ${page}${timeframeMsg}...`, 'loading');
-                
-                try {
-                    const response = await fetch(`${LIGHTER_API}/api/v1/trades?${params}`, {
-                        headers: { 'Authorization': authToken }
-                    });
-                    
-                    if (response.status === 429) {
-                        showStatus('fetchStatus', `Rate limited, waiting 15s...`, 'loading');
-                        await new Promise(r => setTimeout(r, 15000));
-                        continue;
-                    }
-                    
-                    if (!response.ok) {
-                        console.error(`HTTP error: ${response.status}`);
-                        break;
-                    }
-                    
-                    const data = await response.json();
-                    if (data.code !== 200) {
-                        console.error(`API error: ${data.code}`);
-                        break;
-                    }
-                    
-                    let trades = data.trades || [];
-                    
-                    // If we have a start timestamp (fromTimestamp), check if we should stop
-                    // Trades come in descending order (newest first), so we stop when we hit trades older than fromTimestamp
-                    if (fromTimestamp && trades.length > 0) {
-                        const filteredTrades = [];
-                        for (const trade of trades) {
-                            const tradeTime = trade.timestamp;
-                            if (tradeTime >= fromTimestamp) {
-                                filteredTrades.push(trade);
-                            } else {
-                                reachedStart = true;
-                            }
-                        }
-                        trades = filteredTrades;
-                    }
-                    
-                    allTrades.push(...trades);
-                    
-                    if (!data.next_cursor || trades.length === 0 || reachedStart) {
-                        break;
-                    }
-                    
-                    cursor = data.next_cursor;
-                    
-                    // Rate limit delay
-                    await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY));
-                    
-                } catch (error) {
-                    console.error(`Error fetching trades: ${error}`);
-                    break;
-                }
-            }
-            
-            // Final filter to ensure all trades are within the timeframe
-            if (fromTimestamp || toTimestamp) {
-                return allTrades.filter(trade => {
-                    const tradeTime = trade.timestamp;
-                    const afterStart = fromTimestamp ? tradeTime >= fromTimestamp : true;
-                    const beforeEnd = toTimestamp ? tradeTime <= toTimestamp : true;
-                    return afterStart && beforeEnd;
-                });
-            }
-            
-            return allTrades;
+            return LighterTradeExport.fetchTrades({
+                apiBase: LIGHTER_API, authToken, accountIndex, fromTimestamp, toTimestamp,
+                onProgress: message => showStatus('fetchStatus', message, 'loading')
+            });
         }
 
         // Step 3: Fetch trades
@@ -2179,46 +2086,20 @@
             
             try {
                 // Fetch trades for all selected accounts using the single read-only token
+                document.getElementById('resultsCard').classList.add('hidden');
                 fetchedData = {};
                 rawTradesData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    // Fetch raw trades from Lighter with optional timeframe
-                    const rawTrades = await fetchTradesFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
-                    
-                    // Store raw trades for JSON export
-                    rawTradesData[accountIndex] = rawTrades;
-                    
-                    // Process trades through our server (adds market names, PnL, etc.)
-                    showStatus('fetchStatus', `Processing ${rawTrades.length} trades for account #${accountIndex}...`, 'loading');
-                    
-                    const processResponse = await fetch('/api/process-trades', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            account_index: accountIndex,
-                            trades: rawTrades
-                        })
-                    });
-                    
-                    const processedData = await processResponse.json();
-                    
-                    if (processResponse.ok && processedData.success) {
-                        fetchedData[accountIndex] = {
-                            success: true,
-                            total_trades: processedData.total_trades,
-                            trades: processedData.trades
-                        };
-                    } else {
-                        fetchedData[accountIndex] = {
-                            success: false,
-                            error: processedData.detail || 'Processing failed',
-                            total_trades: 0,
-                            trades: []
-                        };
-                    }
+                    const exported = await fetchTradesFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
+                    rawTradesData[accountIndex] = exported.raw_trades;
+                    fetchedData[accountIndex] = {
+                        success: true,
+                        total_trades: exported.trades.length,
+                        trades: exported.trades
+                    };
                 }
-                
+
                 // Count total trades
                 let totalTrades = 0;
                 Object.values(fetchedData).forEach(acc => {
@@ -2233,6 +2114,8 @@
                 document.getElementById('resultsCard').classList.remove('hidden');
 
             } catch (error) {
+                fetchedData = {};
+                rawTradesData = {};
                 showStatus('fetchStatus', `Error: ${error.message}`, 'error');
             } finally {
                 setAllFetchButtonsDisabled(false);
@@ -2339,7 +2222,7 @@
                     const safeValue = escapeHtml(value);
                     // Green for buy actions: Open Long, Increase Long, Close Short, Reduce Short, Short > Long
                     // Red for sell actions: Open Short, Increase Short, Close Long, Reduce Long, Long > Short
-                    const isBuyAction = ['Open Long', 'Increase Long', 'Close Short', 'Reduce Short', 'Short > Long'].includes(value);
+                    const isBuyAction = ['Buy', 'Open Long', 'Increase Long', 'Close Short', 'Reduce Short', 'Short > Long'].includes(value);
                     const sideClass = isBuyAction ? 'long' : 'short';
                     return `<span class="trade-side ${sideClass}">${safeValue}</span>`;
                 case 'trade_value_usd':
@@ -2428,16 +2311,18 @@
 
             // Download
             const BOM = '\uFEFF';
-            const encodedContent = encodeURIComponent(BOM + csvContent);
-            const dataUri = `data:text/csv;charset=utf-8,${encodedContent}`;
+            const url = URL.createObjectURL(new Blob([BOM, csvContent], { type: 'text/csv;charset=utf-8' }));
             
             const a = document.createElement('a');
             a.style.display = 'none';
-            a.href = dataUri;
+            a.href = url;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            a.remove();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
         }
         
         // Export JSON for a specific account (raw data)

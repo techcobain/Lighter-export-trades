@@ -14,7 +14,8 @@ A web app to fetch and export trading data from [Lighter Exchange](https://light
 - **CSV & JSON export** — Per-account downloads in both formats
 - **Click to copy** — Copy transaction hashes and addresses with one click
 - **Asset symbols** — Automatic mapping of asset IDs to symbols (cached hourly)
-- **Automatic pagination** — Handles rate limits and fetches all data
+- **Complete trade history** — Bulk exports bypass the 3,000-trade history cap, with automatic date-range splitting and rate-limit retries
+- **Automatic pagination** — Handles pagination for funding and wallet history
 
 ## Quick Start
 
@@ -44,11 +45,13 @@ Visit `http://localhost:8000`
 
 | Type | Endpoint | Description |
 |------|----------|-------------|
-| **Trades** | `/api/v1/trades` | Trade history with PnL calculation |
+| **Trades** | `/api/v1/export?type=trade` | Trade history with PnL and fees from Lighter |
 | **Funding** | `/api/v1/positionFunding` | Funding payments on positions |
 | **Deposits** | `/api/v1/deposit/history` | L1 deposits (Ethereum) |
 | **Transfers** | `/api/v1/transfer/history` | L2 transfers between accounts |
 | **Withdrawals** | `/api/v1/withdraw/history` | Withdrawals to L1/L2 (Arbitrum) |
+
+Trade exports use non-aggregated fills and automatically split history into ranges of at most 180 days. Ranges reaching Lighter's one-million-row export limit are split further, and overlapping boundaries are deduplicated by trade ID. The table, column selection, filters, CSV format, and JSON envelope remain the same. JSON trade records now contain the raw export CSV fields. Transaction hashes are blank because Lighter's export does not include them. Spot trades use Lighter's Buy/Sell labels.
 
 ### Transaction Hash Types
 
@@ -67,11 +70,11 @@ Visit `http://localhost:8000`
 | Component | Description |
 |-----------|-------------|
 | Auth | Read-only tokens from Lighter (user-provided) |
-| Data fetching | Client-side direct to Lighter API |
-| Trade processing | Server-side (market names, PnL calculation) |
+| Data fetching | Client-side direct to Lighter API; signed trade export files downloaded server-side |
+| Trade processing | Server-side conversion of export CSV into the existing display fields |
 | Asset mapping | Client-side with hourly cache |
 
-Data is fetched directly from your browser to Lighter's API, so rate limits apply to your IP (not the server).
+Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser; only the signed download URL is sent to the server. Download URLs are restricted to Lighter's mainnet export storage, with redirects disabled.
 
 ## API Endpoints
 
@@ -80,13 +83,14 @@ Data is fetched directly from your browser to Lighter's API, so rate limits appl
 | `/` | GET | Web interface |
 | `/api/lookup-accounts` | POST | Get account indexes for L1 address |
 | `/api/process-trades` | POST | Process raw trades (add market names, PnL) |
+| `/api/process-trades-export` | POST | Download and process a signed trade export CSV |
 | `/api/markets` | GET | Cached market details |
 
 ## Rate Limits
 
 | Data Type | Rate | Pages/Min |
 |-----------|------|-----------|
-| Trades | 3.5s delay | ~17 |
+| Trades | 3.5s between bulk exports; retries on HTTP 429/405 | Varies by export size |
 | Funding | 1s delay | ~60 |
 | Deposits/Transfers/Withdrawals | 1s delay | ~60 |
 
@@ -117,6 +121,15 @@ Strict-Transport-Security: max-age=31536000
 - **Backend**: FastAPI + Lighter SDK
 - **Frontend**: Vanilla HTML/CSS/JS
 - **HTTP**: httpx (async)
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+node --test tests/trade-export.test.cjs
+```
+
+These tests use synthetic data and mocked downloads; no account credentials are required.
 
 ## License
 

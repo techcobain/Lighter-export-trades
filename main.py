@@ -2,11 +2,14 @@
 Lighter Trades Fetcher - Fetch and export trading history from Lighter exchange.
 """
 
+import csv
+import io
 import re
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from collections import defaultdict
+from urllib.parse import urlsplit
 import httpx
 from eth_utils.address import to_checksum_address
 from fastapi import FastAPI, HTTPException, Request
@@ -17,13 +20,13 @@ from pydantic import BaseModel
 
 # Configuration
 BASE_URL = "https://mainnet.zklighter.elliot.ai"
-TRADES_LIMIT = 100
-RATE_LIMIT_DELAY = 3.5
-RATE_LIMIT_RETRY_DELAY = 15
+EXPORT_DOWNLOAD_HOST = "zklighter-perps-mainnet-data-export.s3.ap-northeast-1.amazonaws.com"
+EXPORT_ROW_LIMIT = 1_000_000
 
 ENDPOINT_RATE_LIMITS = {
     "/api/lookup-accounts": {"requests": 20, "window": 60},
     "/api/process-trades": {"requests": 30, "window": 60},
+    "/api/process-trades-export": {"requests": 30, "window": 60},
 }
 
 
@@ -98,6 +101,10 @@ class LookupAccountsRequest(BaseModel):
 class ProcessTradesRequest(BaseModel):
     account_index: int
     trades: list[dict]
+
+
+class ProcessTradesExportRequest(BaseModel):
+    data_url: str
 
 
 class TradeData(BaseModel):
@@ -282,7 +289,81 @@ def process_trade(trade: dict, account_index: int, market_map: dict) -> TradeDat
     )
 
 
+def process_export_csv(content: str) -> dict:
+    """Map Lighter's export CSV to the existing table/CSV fields."""
+    csv_file = io.StringIO(content.lstrip("\ufeff"))
+    reader = csv.DictReader(csv_file, strict=True)
+    required_columns = {
+        "Market", "Side", "Date", "Trade Value", "Size", "Price",
+        "Closed PnL", "Fee", "Role", "Type", "Trade ID",
+    }
+    if not required_columns.issubset(reader.fieldnames or []):
+        raise ValueError("Unexpected trade export columns")
+
+    # Count before creating display objects, avoiding large allocations for capped ranges.
+    for count, row in enumerate(reader, start=1):
+        if None in row or any(row.get(column) is None for column in required_columns):
+            raise ValueError("Incomplete trade export row")
+        if count >= EXPORT_ROW_LIMIT:
+            return {"success": True, "limit_reached": True}
+
+    csv_file.seek(0)
+    raw_rows = []
+    processed = []
+    for row in csv.DictReader(csv_file, strict=True):
+        raw_rows.append(row)
+        is_spot = "/" in row["Market"]
+        dt = datetime.strptime(row["Date"], "%Y-%m-%d %H:%M:%S")
+        pnl = row["Closed PnL"].strip()
+        processed.append(TradeData(
+            trade_id=int(row["Trade ID"]),
+            tx_hash="",  # Not provided by the export endpoint.
+            market=row["Market"].split("/")[0] if is_spot else row["Market"],
+            market_type="Spot" if is_spot else "Perp",
+            side=row["Side"],
+            datetime_utc=dt.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            trade_value_usd=round(float(row["Trade Value"]), 2),
+            size=float(row["Size"]),
+            price_usd=round(float(row["Price"]), 6),
+            fee_usd=round(float(row["Fee"]), 6),
+            role=row["Role"],
+            trade_type=row["Type"],
+            pnl_usd=round(float(pnl), 4) if pnl not in ("", "-") else None,
+        ).model_dump())
+
+    processed.sort(key=lambda trade: (trade["datetime_utc"], trade["trade_id"]), reverse=True)
+    return {
+        "success": True, "limit_reached": False, "total_trades": len(processed),
+        "trades": processed, "raw_trades": raw_rows,
+    }
+
+
 # API Endpoints
+@app.post("/api/process-trades-export")
+async def process_trades_export(request: ProcessTradesExportRequest):
+    """Download a signed Lighter export and convert it without storing credentials."""
+    try:
+        url = urlsplit(request.data_url)
+        valid_url = (
+            url.scheme == "https" and url.hostname == EXPORT_DOWNLOAD_HOST
+            and url.port in (None, 443) and not url.username and not url.password
+        )
+    except ValueError:
+        valid_url = False
+    if not valid_url:
+        raise HTTPException(status_code=400, detail="Invalid Lighter export download URL")
+
+    try:
+        async with httpx.AsyncClient(timeout=120, follow_redirects=False) as client:
+            response = await client.get(request.data_url)
+            response.raise_for_status()
+        return process_export_csv(response.content.decode("utf-8-sig"))
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Failed to download trade export. Please fetch again.")
+    except (ValueError, csv.Error, OverflowError):
+        raise HTTPException(status_code=502, detail="Invalid trade export data")
+
+
 @app.post("/api/lookup-accounts")
 async def lookup_accounts(request: LookupAccountsRequest):
     """Lookup account indexes for an L1 address."""
