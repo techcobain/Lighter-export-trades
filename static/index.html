@@ -181,6 +181,13 @@
             font-weight: 400;
         }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
         .theme-switch {
             display: inline-flex;
             align-items: center;
@@ -608,6 +615,14 @@
             border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s;
+            height: 36px;
+            box-sizing: border-box;
+        }
+
+        .timeframe-preset {
+            font: inherit;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
         }
 
         .timeframe-option:hover {
@@ -724,7 +739,10 @@
 
         .hours-toggle {
             display: flex;
+            flex-direction: row;
             align-items: center;
+            flex-basis: 100%;
+            margin-top: 2px;
         }
 
         .hours-toggle .checkbox-label {
@@ -1229,16 +1247,24 @@
         <header>
             <div>
                 <h1><span>LIGHTER</span> EXPORT TRADING DATA</h1>
-                <p class="subtitle">Fetch trades, funding, deposits, transfers, and withdrawals</p>
+                <p class="subtitle">Export trading, wallet, public pool, and staking history</p>
             </div>
-            <label class="theme-switch" for="themeToggle">
-                <span>Dark</span>
-                <input type="checkbox" id="themeToggle" onchange="setThemeFromToggle(this.checked)" aria-label="Use light mode">
-                <span class="theme-switch-track">
-                    <span class="theme-switch-thumb"></span>
-                </span>
-                <span>Light</span>
-            </label>
+            <div class="header-controls">
+                <label class="theme-switch" for="networkToggle">
+                    <span>Core</span>
+                    <input type="checkbox" id="networkToggle" onchange="setNetwork(this.checked ? 'rh' : 'core')" aria-label="Use Lighter RH">
+                    <span class="theme-switch-track"><span class="theme-switch-thumb"></span></span>
+                    <span>RH</span>
+                </label>
+                <label class="theme-switch" for="themeToggle">
+                    <span>Dark</span>
+                    <input type="checkbox" id="themeToggle" onchange="setThemeFromToggle(this.checked)" aria-label="Use light mode">
+                    <span class="theme-switch-track">
+                        <span class="theme-switch-thumb"></span>
+                    </span>
+                    <span>Light</span>
+                </label>
+            </div>
         </header>
 
         <!-- FAQ Section -->
@@ -1372,33 +1398,38 @@
                 <div class="timeframe-selector">
                     <div class="timeframe-selector-title">Timeframe</div>
                     <div class="timeframe-options">
-                        <div class="timeframe-option active" onclick="selectTimeframe('complete')">
+                        <div class="timeframe-option active" data-timeframe="complete" onclick="selectTimeframe('complete')">
                             <input type="radio" name="timeframe" id="timeframeComplete" value="complete" checked>
                             <label for="timeframeComplete">Complete account history</label>
                             <span class="timeframe-info-icon">i
                                 <span class="timeframe-tooltip">Fetches all data from account creation to present</span>
                             </span>
                         </div>
-                        <div class="timeframe-option" onclick="selectTimeframe('custom')">
+                        <div class="timeframe-option" data-timeframe="custom" onclick="selectTimeframe('custom')">
                             <input type="radio" name="timeframe" id="timeframeCustom" value="custom">
                             <label for="timeframeCustom">Custom timeframe</label>
                             <span class="timeframe-info-icon">i
                                 <span class="timeframe-tooltip">Select specific start and end dates</span>
                             </span>
                         </div>
+                        <button type="button" class="timeframe-option timeframe-preset" data-preset="7D" aria-pressed="false" onclick="selectTimeframePreset('7D')">7D</button>
+                        <button type="button" class="timeframe-option timeframe-preset" data-preset="30D" aria-pressed="false" onclick="selectTimeframePreset('30D')">30D</button>
+                        <button type="button" class="timeframe-option timeframe-preset" data-preset="90D" aria-pressed="false" onclick="selectTimeframePreset('90D')">90D</button>
+                        <button type="button" class="timeframe-option timeframe-preset" data-preset="2026" aria-pressed="false" onclick="selectTimeframePreset('2026')">2026</button>
+                        <button type="button" class="timeframe-option timeframe-preset" data-preset="2025" aria-pressed="false" title="Starts January 17, 2025 (mainnet genesis)" onclick="selectTimeframePreset('2025')">2025</button>
                     </div>
                     <div class="date-range-inputs" id="dateRangeInputs">
                         <div class="date-input-group">
                             <label for="dateFrom">From (Start)</label>
-                            <input type="date" id="dateFrom">
+                            <input type="date" id="dateFrom" onchange="clearTimeframePreset()">
                         </div>
                         <div class="date-input-group">
                             <label for="dateTo">To (End)</label>
-                            <input type="date" id="dateTo">
+                            <input type="date" id="dateTo" onchange="clearTimeframePreset()">
                         </div>
                         <div class="date-input-group hours-toggle">
-                            <label class="checkbox-label" onclick="toggleHoursSelection()">
-                                <input type="checkbox" id="includeHours">
+                            <label class="checkbox-label" for="includeHours">
+                                <input type="checkbox" id="includeHours" onchange="toggleHoursSelection(); clearTimeframePreset()">
                                 <span>Include specific hours</span>
                             </label>
                         </div>
@@ -1431,6 +1462,8 @@
                     <button class="btn-primary" id="fetchWithdrawalsBtn" onclick="fetchWithdrawals()">
                         Fetch Withdrawals
                     </button>
+                    <button class="btn-primary" id="fetchPoolsBtn" onclick="fetchPoolActivity('public')">Fetch Public Pools</button>
+                    <button class="btn-primary" id="fetchStakingBtn" onclick="fetchPoolActivity('staking')">Fetch Staking</button>
                 </div>
                 <div id="fetchStatus" class="status"></div>
             </div>
@@ -1506,32 +1539,24 @@
                 <!-- Type Filter -->
                 <div class="type-filter" id="transferTypeFilter" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Filter by Type:</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <label class="column-option active" onclick="toggleTransferType('L2TransferOutflow')">
-                            <input type="checkbox" checked onchange="toggleTransferType('L2TransferOutflow')" onclick="event.stopPropagation()">
-                            Outgoing Transfer
-                        </label>
-                        <label class="column-option active" onclick="toggleTransferType('L2TransferInflow')">
-                            <input type="checkbox" checked onchange="toggleTransferType('L2TransferInflow')" onclick="event.stopPropagation()">
-                            Incoming Transfer
-                        </label>
-                        <label class="column-option active" onclick="toggleTransferType('L2SelfTransfer')">
-                            <input type="checkbox" checked onchange="toggleTransferType('L2SelfTransfer')" onclick="event.stopPropagation()">
-                            Internal Transfer
-                        </label>
-                        <label class="column-option active" onclick="toggleTransferType('L2MintSharesOutflow')">
-                            <input type="checkbox" checked onchange="toggleTransferType('L2MintSharesOutflow')" onclick="event.stopPropagation()">
-                            Public Pool Mint
-                        </label>
-                        <label class="column-option active" onclick="toggleTransferType('L2BurnSharesInflow')">
-                            <input type="checkbox" checked onchange="toggleTransferType('L2BurnSharesInflow')" onclick="event.stopPropagation()">
-                            Public Pool Burn
-                        </label>
-                    </div>
+                    <div id="transferTypeOptions" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
                 </div>
                 <div id="transfersTabs" class="tabs"></div>
                 <div id="transfersContents"></div>
             </div>
+        </div>
+
+        <div class="card hidden" id="poolsCard">
+            <div class="card-title collapsible" onclick="toggleCardCollapse('poolsCard')">
+                <span>Public Pool Deposits &amp; Withdrawals</span><span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content"><div id="poolsTabs" class="tabs"></div><div id="poolsContents"></div></div>
+        </div>
+        <div class="card hidden" id="stakingCard">
+            <div class="card-title collapsible" onclick="toggleCardCollapse('stakingCard')">
+                <span>Staking Deposits &amp; Withdrawals</span><span class="collapse-icon">▼</span>
+            </div>
+            <div class="card-content"><div id="stakingTabs" class="tabs"></div><div id="stakingContents"></div></div>
         </div>
 
         <!-- Withdrawals Results -->
@@ -1560,6 +1585,7 @@
     </div>
 
     <script src="/static/trade-export.js"></script>
+    <script src="/static/pool-history.js"></script>
     <script>
         // ===== SECURITY: HTML Escaping to prevent XSS =====
         function escapeHtml(unsafe) {
@@ -1628,6 +1654,8 @@
         let fundingData = {}; // { accountIndex: { fundings: [...], ... } }
         let rawFundingData = {}; // { accountIndex: [raw funding from API] }
         let selectedTimeframe = 'complete'; // 'complete' or 'custom'
+        let selectedPreset = null;
+        let poolActivityData = { public: {}, staking: {} };
         let customDateFrom = null; // Timestamp in ms
         let customDateTo = null; // Timestamp in ms
         let depositsData = {}; // { accountIndex: { deposits: [...], ... } }
@@ -1668,6 +1696,32 @@
         let assetCacheTimestamp = 0;
         const ASSET_CACHE_TTL = 3600000; // 1 hour in ms
         
+        const API_BASES = { core: 'https://mainnet.zklighter.elliot.ai', rh: 'https://api.rh.lighter.xyz' };
+        let selectedNetwork = 'core';
+        let LIGHTER_API = API_BASES.core;
+
+        function setNetwork(network) {
+            if (!API_BASES[network]) return;
+            selectedNetwork = network;
+            LIGHTER_API = API_BASES[network];
+            accountIndexes = [];
+            readOnlyToken = null;
+            fetchedData = {}; rawTradesData = {};
+            fundingData = {}; rawFundingData = {};
+            depositsData = {}; rawDepositsData = {};
+            transfersData = {}; rawTransfersData = {};
+            withdrawalsData = {}; rawWithdrawalsData = {};
+            poolActivityData = { public: {}, staking: {} };
+            assetCache = {}; assetCacheTimestamp = 0;
+            document.getElementById('readOnlyToken').value = '';
+            document.getElementById('accountsList').innerHTML = '';
+            ['step2Card', 'step3Card', 'resultsCard', 'fundingCard', 'depositsCard', 'transfersCard', 'withdrawalsCard', 'poolsCard', 'stakingCard'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            ['tokenStatus', 'fetchStatus'].forEach(hideStatus);
+            showStatus('lookupStatus', `Lighter ${network === 'core' ? 'Core' : 'RH'} selected. Look up your accounts and enter a token for this network.`, 'loading');
+        }
+
         // Transfer type mappings
         const TRANSFER_TYPE_MAP = {
             'L2TransferOutflow': 'Outgoing Transfer',
@@ -1676,15 +1730,16 @@
             'L2SelfTransfer': 'Internal Transfer',
             'L2TransferInflow': 'Incoming Transfer'
         };
+        ['L2MintShares', 'L2BurnShares', 'L1BurnShares', 'L2ForceBurnShares', 'L2CreatePublicPool',
+            'L2StakeAsset', 'L2UnstakeAsset', 'L1UnstakeAsset', 'L2CreateStakingPool'].forEach(type => {
+            ['Inflow', 'Outflow'].forEach(flow => {
+                const activity = LighterPoolHistory.classify({ type: type + flow });
+                TRANSFER_TYPE_MAP[type + flow] = `${activity.kind === 'staking' ? 'Staking' : 'Public Pool'} ${activity.action} (${activity.direction})`;
+            });
+        });
         
         // Transfer type filter state (all enabled by default)
-        let transferTypeFilters = {
-            'L2TransferOutflow': true,
-            'L2BurnSharesInflow': true,
-            'L2MintSharesOutflow': true,
-            'L2SelfTransfer': true,
-            'L2TransferInflow': true
-        };
+        let transferTypeFilters = Object.fromEntries(Object.keys(TRANSFER_TYPE_MAP).map(type => [type, true]));
         
         // Market type filter state (all enabled by default)
         let marketTypeFilters = {
@@ -1829,6 +1884,7 @@
 
             const btn = document.getElementById('lookupBtn');
             btn.disabled = true;
+            document.getElementById('networkToggle').disabled = true;
             btn.innerHTML = '<span class="spinner"></span>Looking up...';
             showStatus('lookupStatus', 'Fetching account indexes...', 'loading');
 
@@ -1836,7 +1892,7 @@
                 const response = await fetch('/api/lookup-accounts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ l1_address: l1Address })
+                    body: JSON.stringify({ l1_address: l1Address, network: selectedNetwork })
                 });
 
                 const data = await response.json();
@@ -1855,6 +1911,7 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Lookup Accounts';
+                document.getElementById('networkToggle').disabled = false;
             }
         }
 
@@ -1928,14 +1985,12 @@
             return selected;
         }
 
-        // Lighter API base URL
-        const LIGHTER_API = 'https://mainnet.zklighter.elliot.ai';
         const FUNDING_RATE_LIMIT_DELAY = 1000; // 1s between funding calls (60/min limit)
         const WALLET_RATE_LIMIT_DELAY = 1000; // 1s between wallet calls (60/min limit)
         
         // Helper to disable/enable all fetch buttons
         function setAllFetchButtonsDisabled(disabled) {
-            ['fetchTradesBtn', 'fetchFundingBtn', 'fetchDepositsBtn', 'fetchTransfersBtn', 'fetchWithdrawalsBtn'].forEach(id => {
+            ['fetchTradesBtn', 'fetchFundingBtn', 'fetchDepositsBtn', 'fetchTransfersBtn', 'fetchWithdrawalsBtn', 'fetchPoolsBtn', 'fetchStakingBtn', 'networkToggle', 'lookupBtn'].forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) btn.disabled = disabled;
             });
@@ -1944,6 +1999,7 @@
         // Timeframe selector functions
         function selectTimeframe(type) {
             selectedTimeframe = type;
+            clearTimeframePreset();
             
             // Update UI
             document.querySelectorAll('.timeframe-option').forEach(opt => {
@@ -1952,12 +2008,12 @@
             
             if (type === 'complete') {
                 document.getElementById('timeframeComplete').checked = true;
-                document.querySelector('.timeframe-option:nth-child(1)').classList.add('active');
+                document.querySelector('[data-timeframe="complete"]').classList.add('active');
                 document.getElementById('dateRangeInputs').classList.remove('visible');
                 document.getElementById('timeRangeInputs').classList.remove('visible');
             } else {
                 document.getElementById('timeframeCustom').checked = true;
-                document.querySelector('.timeframe-option:nth-child(2)').classList.add('active');
+                document.querySelector('[data-timeframe="custom"]').classList.add('active');
                 document.getElementById('dateRangeInputs').classList.add('visible');
                 
                 // Set default dates if not already set
@@ -1976,6 +2032,36 @@
                     dateToInput.value = formatDateOnly(new Date());
                 }
             }
+        }
+
+        function clearTimeframePreset() {
+            selectedPreset = null;
+            document.querySelectorAll('[data-preset]').forEach(button => {
+                button.classList.remove('active');
+                button.setAttribute('aria-pressed', 'false');
+            });
+        }
+
+        function selectTimeframePreset(preset) {
+            selectTimeframe('custom');
+            const today = new Date().toISOString().slice(0, 10);
+            let from, to;
+            if (preset.endsWith('D')) {
+                const days = Number(preset.slice(0, -1));
+                from = new Date(Date.parse(today + 'T00:00:00Z') - (days - 1) * 86400000).toISOString().slice(0, 10);
+                to = today;
+            } else {
+                from = preset === '2025' ? '2025-01-17' : `${preset}-01-01`;
+                to = `${preset}-12-31` < today ? `${preset}-12-31` : today;
+            }
+            document.getElementById('dateFrom').value = from;
+            document.getElementById('dateTo').value = to;
+            document.getElementById('includeHours').checked = false;
+            toggleHoursSelection();
+            selectedPreset = preset;
+            const button = document.querySelector(`[data-preset="${preset}"]`);
+            button.classList.add('active');
+            button.setAttribute('aria-pressed', 'true');
         }
         
         function toggleHoursSelection() {
@@ -3106,95 +3192,14 @@
             return trades.filter(t => marketTypeFilters[t.market_type]);
         }
         
-        // Fetch transfers from Lighter API
-        // Transfers timestamp is in milliseconds
-        // Transfers API: data comes in descending order (newest first)
-        // We fetch from the beginning and stop when we hit events older than fromTimestamp (start date)
+        // Pools and ordinary transfers share the same paginated history endpoint.
         async function fetchTransfersFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
-            const allTransfers = [];
-            let cursor = null;
-            let page = 0;
-            let reachedStart = false;
-            
-            while (true) {
-                page++;
-                const params = new URLSearchParams({
-                    account_index: accountIndex
-                });
-                if (cursor) {
-                    params.append('cursor', cursor);
-                }
-                
-                const timeframeMsg = fromTimestamp ? ' (filtered)' : '';
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching transfers page ${page}${timeframeMsg}...`, 'loading');
-                
-                try {
-                    const response = await fetch(`${LIGHTER_API}/api/v1/transfer/history?${params}`, {
-                        headers: { 'Authorization': authToken }
-                    });
-                    
-                    if (response.status === 429) {
-                        showStatus('fetchStatus', `Rate limited, waiting 15s...`, 'loading');
-                        await new Promise(r => setTimeout(r, 15000));
-                        continue;
-                    }
-                    
-                    if (!response.ok) {
-                        console.error(`HTTP error: ${response.status}`);
-                        break;
-                    }
-                    
-                    const data = await response.json();
-                    if (data.code !== 200) {
-                        console.error(`API error: ${data.code}`);
-                        break;
-                    }
-                    
-                    let transfers = data.transfers || [];
-                    
-                    // Data comes in descending order (newest first)
-                    // If we have a start timestamp, stop when we hit events older than it
-                    if (fromTimestamp && transfers.length > 0) {
-                        const filteredTransfers = [];
-                        for (const transfer of transfers) {
-                            if (transfer.timestamp >= fromTimestamp) {
-                                // Event is within range (newer than or equal to start date)
-                                filteredTransfers.push(transfer);
-                            } else {
-                                // Event is older than start date - stop fetching
-                                reachedStart = true;
-                            }
-                        }
-                        transfers = filteredTransfers;
-                    }
-                    
-                    allTransfers.push(...transfers);
-                    
-                    if (!data.cursor || transfers.length === 0 || reachedStart) {
-                        break;
-                    }
-                    
-                    cursor = data.cursor;
-                    await new Promise(r => setTimeout(r, WALLET_RATE_LIMIT_DELAY));
-                    
-                } catch (error) {
-                    console.error(`Error fetching transfers: ${error}`);
-                    break;
-                }
-            }
-            
-            // Final filter to ensure all transfers are within the timeframe
-            if (fromTimestamp || toTimestamp) {
-                return allTransfers.filter(transfer => {
-                    const afterStart = fromTimestamp ? transfer.timestamp >= fromTimestamp : true;
-                    const beforeEnd = toTimestamp ? transfer.timestamp <= toTimestamp : true;
-                    return afterStart && beforeEnd;
-                });
-            }
-            
-            return allTransfers;
+            return LighterPoolHistory.fetchHistory({
+                apiBase: LIGHTER_API, authToken, accountIndex, fromTimestamp, toTimestamp,
+                onProgress: message => showStatus('fetchStatus', message, 'loading')
+            });
         }
-        
+
         // Fetch transfers for all selected accounts
         async function fetchTransfers() {
             if (!readOnlyToken) {
@@ -3287,7 +3292,7 @@
         
         // Get filtered transfers based on type filters
         function getFilteredTransfers(transfers) {
-            return transfers.filter(t => transferTypeFilters[t.raw_type]);
+            return transfers.filter(t => transferTypeFilters[t.raw_type] !== false);
         }
         
         // Display transfers results
@@ -3823,9 +3828,129 @@
             }, 100);
         }
         
+        // ===== PUBLIC POOL AND STAKING HISTORY =====
+        const POOL_COLUMNS = {
+            id: 'ID', pool_index: 'Pool Account', action: 'Action', direction: 'Direction',
+            asset: 'Asset', amount: 'Amount', fee: 'Fee', datetime_utc: 'Time (UTC)',
+            raw_type: 'Type', from_account_index: 'From Account', to_account_index: 'To Account', tx_hash: 'Transaction Hash'
+        };
+
+        function renderTransferTypeFilters() {
+            document.getElementById('transferTypeOptions').innerHTML = Object.entries(TRANSFER_TYPE_MAP).map(([type, label]) => `
+                <label class="column-option active" onclick="toggleTransferType('${type}')">
+                    <input type="checkbox" checked onchange="toggleTransferType('${type}')" onclick="event.stopPropagation()">
+                    ${escapeHtml(label)}
+                </label>`).join('');
+        }
+
+        async function fetchPoolActivity(kind) {
+            if (!['public', 'staking'].includes(kind)) return;
+            const accounts = getSelectedAccounts();
+            if (!readOnlyToken || !accounts.length) {
+                showStatus('fetchStatus', 'Enter a read-only token and select at least one account.', 'error');
+                return;
+            }
+            if (!validateTimeframe()) return;
+            const { fromTimestamp, toTimestamp } = getTimeframeParams();
+            const prefix = kind === 'public' ? 'pools' : 'staking';
+            const button = document.getElementById(kind === 'public' ? 'fetchPoolsBtn' : 'fetchStakingBtn');
+            const label = button.textContent;
+            setAllFetchButtonsDisabled(true);
+            button.innerHTML = '<span class="spinner"></span>Fetching...';
+            document.getElementById(`${prefix}Card`).classList.add('hidden');
+            poolActivityData[kind] = {};
+            try {
+                await fetchAssetDetails();
+                for (const index of accounts) {
+                    const history = await fetchTransfersFromLighter(readOnlyToken, index, fromTimestamp, toTimestamp);
+                    const raw = history.filter(row => LighterPoolHistory.classify(row)?.kind === kind);
+                    const events = processTransfers(raw).map((row, i) => ({ ...row, ...LighterPoolHistory.classify(raw[i]) }));
+                    poolActivityData[kind][index] = { events, raw };
+                }
+                displayPoolActivity(kind);
+                document.getElementById(`${prefix}Card`).classList.remove('hidden');
+                const total = Object.values(poolActivityData[kind]).reduce((count, data) => count + data.events.length, 0);
+                showStatus('fetchStatus', `Successfully fetched ${total} ${kind === 'public' ? 'public pool' : 'staking'} deposits and withdrawals`, 'success');
+            } catch (error) {
+                poolActivityData[kind] = {};
+                showStatus('fetchStatus', `Error: ${error.message}`, 'error');
+            } finally {
+                button.textContent = label;
+                setAllFetchButtonsDisabled(false);
+            }
+        }
+
+        function displayPoolActivity(kind) {
+            const prefix = kind === 'public' ? 'pools' : 'staking';
+            const tabs = document.getElementById(`${prefix}Tabs`);
+            const contents = document.getElementById(`${prefix}Contents`);
+            tabs.innerHTML = ''; contents.innerHTML = '';
+            Object.entries(poolActivityData[kind]).forEach(([index, data], i) => {
+                const account = Number(index);
+                const tab = document.createElement('div');
+                tab.className = `tab ${i === 0 ? 'active' : ''}`;
+                tab.id = `${prefix}-tab-${account}`;
+                tab.textContent = `Account #${account}`;
+                tab.onclick = () => switchPoolTab(kind, account);
+                tabs.appendChild(tab);
+                const content = document.createElement('div');
+                content.className = `tab-content ${i === 0 ? 'active' : ''}`;
+                content.id = `${prefix}-content-${account}`;
+                content.innerHTML = data.events.length ? `
+                    <div class="results-header"><span class="results-stats">${data.events.length} deposits and withdrawals</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-secondary btn-small" onclick="exportPoolActivity('${kind}', ${account}, 'csv')">CSV</button>
+                            <button class="btn-secondary btn-small" onclick="exportPoolActivity('${kind}', ${account}, 'json')">JSON</button>
+                        </div>
+                    </div><div class="results-box">${buildPoolTable(data.events)}</div>`
+                    : '<div class="error-message">No deposits or withdrawals found for this account and timeframe</div>';
+                contents.appendChild(content);
+            });
+        }
+
+        function switchPoolTab(kind, account) {
+            const prefix = kind === 'public' ? 'pools' : 'staking';
+            document.querySelectorAll(`#${prefix}Tabs .tab, #${prefix}Contents .tab-content`).forEach(element => element.classList.remove('active'));
+            document.getElementById(`${prefix}-tab-${account}`).classList.add('active');
+            document.getElementById(`${prefix}-content-${account}`).classList.add('active');
+        }
+
+        function buildPoolTable(events) {
+            const keys = Object.keys(POOL_COLUMNS);
+            return '<table class="trades-table"><thead><tr>' + keys.map(key => `<th>${POOL_COLUMNS[key]}</th>`).join('') + '</tr></thead><tbody>' +
+                events.map(event => '<tr>' + keys.map(key => {
+                    const cell = key === 'tx_hash' ? formatCell(event, 'tx_hash') : key === 'action'
+                        ? `<span class="trade-side ${event.direction === 'Incoming' ? 'long' : 'short'}">${escapeHtml(event.action)}</span>`
+                        : escapeHtml(event[key]);
+                    return `<td>${cell}</td>`;
+                }).join('') + '</tr>').join('') + '</tbody></table>';
+        }
+
+        function exportPoolActivity(kind, account, format) {
+            const data = poolActivityData[kind]?.[account];
+            if (!data?.events.length) return;
+            let blob;
+            if (format === 'csv') {
+                const keys = Object.keys(POOL_COLUMNS);
+                const rows = [keys.map(key => csvEscape(POOL_COLUMNS[key])).join(',')];
+                for (const event of data.events) rows.push(keys.map(key => csvEscape(event[key])).join(','));
+                blob = new Blob(['\uFEFF', rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+            } else {
+                blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), network: selectedNetwork,
+                    account_index: account, total_events: data.raw.length, events: data.raw }, null, 2)], { type: 'application/json' });
+            }
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `lighter_${kind === 'public' ? 'pools' : 'staking'}_${selectedNetwork}_account_${account}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${format}`;
+            document.body.appendChild(link); link.click();
+            setTimeout(() => { URL.revokeObjectURL(url); link.remove(); }, 100);
+        }
+
         // Initialize on page load
         initTheme();
         initColumnSelection();
+        renderTransferTypeFilters();
     </script>
 </body>
 </html>

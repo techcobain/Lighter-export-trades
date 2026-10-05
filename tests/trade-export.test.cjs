@@ -179,6 +179,7 @@ test('trade table formatting and CSV/JSON downloads retain their output structur
             createElement: () => ({ style: {}, click() { downloads.push(this.download); }, remove() {} }),
         },
     });
+    vm.runInContext(readFileSync(resolve(__dirname, '../static/pool-history.js'), 'utf8'), context);
     vm.runInContext(appSource.slice(0, appSource.indexOf('// Initialize on page load')), context);
     vm.runInContext(`
         fetchedData = {42: {trades: [{trade_id: 7, market: 'LIT', market_type: 'Spot', side: 'Buy',

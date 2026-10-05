@@ -1,13 +1,15 @@
 # Lighter Data Exporter
 
-A web app to fetch and export trading data from [Lighter Exchange](https://lighter.xyz) — trades, funding payments, deposits, transfers, and withdrawals.
+A web app to fetch and export trading data from [Lighter Exchange](https://lighter.xyz) — trades, funding payments, deposits, transfers, withdrawals, public-pool activity, and staking activity.
 
 ## Features
 
-- **5 Data Types** — Trades, Funding, Deposits, Transfers, Withdrawals
+- **7 Data Types** — Trades, Funding, Deposits, Transfers, Withdrawals, Public Pools, Staking
+- **Core & RH** — Switch between Lighter Core and Lighter RH beside the theme selector
 - **Multi-account support** — Fetch data from multiple sub-accounts simultaneously
 - **Read-only tokens** — Uses secure read-only auth tokens (can't trade or withdraw)
 - **Custom timeframes** — Export complete history or select specific date ranges
+- **Quick timeframes** — 7D, 30D, 90D, 2026, and 2025 presets in UTC; 2025 starts at January 17 mainnet genesis
 - **Spot & Perp filtering** — Filter trades by market type (Perpetuals, Spot)
 - **Transfer filtering** — Filter by type (Incoming, Outgoing, Internal, Pool Mint/Burn)
 - **Customizable columns** — Choose which fields to display and export
@@ -38,7 +40,7 @@ Visit `http://localhost:8000`
 1. Enter your L1 address and click "Lookup Accounts"
 2. Get a read-only token from [app.lighter.xyz/read-only-tokens](https://app.lighter.xyz/read-only-tokens)
 3. Select the accounts you want to export data from
-4. Click any of the 5 fetch buttons to retrieve data
+4. Choose a timeframe and click a fetch button to retrieve data
 5. Export as CSV or JSON
 
 ## Data Types
@@ -50,6 +52,12 @@ Visit `http://localhost:8000`
 | **Deposits** | `/api/v1/deposit/history` | L1 deposits (Ethereum) |
 | **Transfers** | `/api/v1/transfer/history` | L2 transfers between accounts |
 | **Withdrawals** | `/api/v1/withdraw/history` | Withdrawals to L1/L2 (Arbitrum) |
+| **Public Pools** | `/api/v1/transfer/history` | Deposits, withdrawals, pool creation, forced exits, and L1 exits |
+| **Staking** | `/api/v1/transfer/history` | Staking-pool deposits, withdrawals, creation, and L1 unstaking |
+
+Core uses `https://mainnet.zklighter.elliot.ai`; RH uses `https://api.rh.lighter.xyz`. The same requests and processing apply to both. Switching clears account selections, tokens, cached asset symbols, and results so data from the two networks cannot mix. Use a read-only token for the selected network.
+
+Pool and staking events have separate result tables, account tabs, CSV downloads, and raw JSON downloads. The tables preserve incoming/outgoing cash-flow directions and pool account indexes. The Transfers view also includes all pool and staking event types.
 
 Trade exports use non-aggregated fills and automatically split history into ranges of at most 180 days. Ranges reaching Lighter's one-million-row export limit are split further, and overlapping boundaries are deduplicated by trade ID. The table, column selection, filters, CSV format, and JSON envelope remain the same. JSON trade records now contain the raw export CSV fields. Transaction hashes are blank because Lighter's export does not include them. Spot trades use Lighter's Buy/Sell labels.
 
@@ -74,7 +82,7 @@ Trade exports use non-aggregated fills and automatically split history into rang
 | Trade processing | Server-side conversion of export CSV into the existing display fields |
 | Asset mapping | Client-side with hourly cache |
 
-Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser; only the signed download URL is sent to the server. Download URLs are restricted to Lighter's mainnet export storage, with redirects disabled.
+Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser; only the signed download URL is sent to the server. Download URLs are restricted to Lighter export buckets on Amazon S3, with redirects disabled.
 
 ## API Endpoints
 
@@ -92,7 +100,7 @@ Lighter API requests are made directly from your browser, so API rate limits app
 |-----------|------|-----------|
 | Trades | 3.5s between bulk exports; retries on HTTP 429/405 | Varies by export size |
 | Funding | 1s delay | ~60 |
-| Deposits/Transfers/Withdrawals | 1s delay | ~60 |
+| Deposits/Transfers/Withdrawals/Pools/Staking | 1s delay | ~60 |
 
 Close the Lighter frontend while fetching to avoid rate limit conflicts.
 
@@ -126,7 +134,7 @@ Strict-Transport-Security: max-age=31536000
 
 ```bash
 python -m unittest discover -s tests -v
-node --test tests/trade-export.test.cjs
+node --test tests/*.test.cjs
 ```
 
 These tests use synthetic data and mocked downloads; no account credentials are required.

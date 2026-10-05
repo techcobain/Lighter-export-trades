@@ -7,7 +7,7 @@ import io
 import re
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from collections import defaultdict
 from urllib.parse import urlsplit
 import httpx
@@ -20,7 +20,12 @@ from pydantic import BaseModel
 
 # Configuration
 BASE_URL = "https://mainnet.zklighter.elliot.ai"
+API_BASES = {"core": BASE_URL, "rh": "https://api.rh.lighter.xyz"}
+Network = Literal["core", "rh"]
 EXPORT_DOWNLOAD_HOST = "zklighter-perps-mainnet-data-export.s3.ap-northeast-1.amazonaws.com"
+EXPORT_DOWNLOAD_HOST_PATTERN = re.compile(
+    r"zklighter-[a-z0-9-]*data-export[a-z0-9-]*\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com"
+)
 EXPORT_ROW_LIMIT = 1_000_000
 
 ENDPOINT_RATE_LIMITS = {
@@ -39,7 +44,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "connect-src 'self' https://mainnet.zklighter.elliot.ai; "
+            "connect-src 'self' https://mainnet.zklighter.elliot.ai https://api.rh.lighter.xyz; "
             "img-src 'self' data:; "
             "frame-ancestors 'none';"
         )
@@ -89,18 +94,20 @@ app = FastAPI(title="Lighter Trades Fetcher")
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
-market_cache = {"data": {}, "last_updated": 0}
+market_cache = {network: {"data": {}, "last_updated": 0} for network in API_BASES}
 MARKET_CACHE_TTL = 3600
 
 
 # Models
 class LookupAccountsRequest(BaseModel):
     l1_address: str
+    network: Network = "core"
 
 
 class ProcessTradesRequest(BaseModel):
     account_index: int
     trades: list[dict]
+    network: Network = "core"
 
 
 class ProcessTradesExportRequest(BaseModel):
@@ -138,16 +145,17 @@ def normalize_eth_address(address: str) -> str:
         raise ValueError("Invalid Ethereum address")
 
 
-async def fetch_market_details() -> dict:
+async def fetch_market_details(network: Network = "core") -> dict:
     """Fetch and cache market details (market_id -> symbol mapping)."""
     current_time = time.time()
-    if market_cache["data"] and (current_time - market_cache["last_updated"]) < MARKET_CACHE_TTL:
-        return market_cache["data"]
+    cache = market_cache[network]
+    if cache["data"] and (current_time - cache["last_updated"]) < MARKET_CACHE_TTL:
+        return cache["data"]
     
     market_map = {}
     async with httpx.AsyncClient() as client:
         # Fetch order book details (contains both perp and spot markets in separate arrays)
-        response = await client.get(f"{BASE_URL}/api/v1/orderBookDetails")
+        response = await client.get(f"{API_BASES[network]}/api/v1/orderBookDetails")
         if response.status_code == 200:
             data = response.json()
             # Perp markets are in "order_book_details"
@@ -162,15 +170,15 @@ async def fetch_market_details() -> dict:
                     market_map[market_id] = book["symbol"]
     
     if market_map:
-        market_cache["data"] = market_map
-        market_cache["last_updated"] = current_time
-    return market_cache["data"] if market_cache["data"] else market_map
+        cache["data"] = market_map
+        cache["last_updated"] = current_time
+    return cache["data"] if cache["data"] else market_map
 
 
-async def get_account_indexes(l1_address: str) -> list[int]:
+async def get_account_indexes(l1_address: str, network: Network = "core") -> list[int]:
     """Fetch account indexes for a given L1 address."""
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{BASE_URL}/api/v1/accountsByL1Address", params={"l1_address": l1_address})
+        response = await client.get(f"{API_BASES[network]}/api/v1/accountsByL1Address", params={"l1_address": l1_address})
         if response.status_code != 200:
             raise HTTPException(status_code=400, detail="Failed to fetch account info")
         data = response.json()
@@ -345,7 +353,7 @@ async def process_trades_export(request: ProcessTradesExportRequest):
     try:
         url = urlsplit(request.data_url)
         valid_url = (
-            url.scheme == "https" and url.hostname == EXPORT_DOWNLOAD_HOST
+            url.scheme == "https" and bool(EXPORT_DOWNLOAD_HOST_PATTERN.fullmatch(url.hostname or ""))
             and url.port in (None, 443) and not url.username and not url.password
         )
     except ValueError:
@@ -372,7 +380,7 @@ async def lookup_accounts(request: LookupAccountsRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    account_indexes = await get_account_indexes(checksummed_address)
+    account_indexes = await get_account_indexes(checksummed_address, request.network)
     if not account_indexes:
         raise HTTPException(status_code=400, detail="No accounts found for this address")
     return {"success": True, "l1_address": checksummed_address, "account_indexes": account_indexes}
@@ -381,7 +389,7 @@ async def lookup_accounts(request: LookupAccountsRequest):
 @app.post("/api/process-trades")
 async def process_trades(request: ProcessTradesRequest):
     """Process raw trades (add market names, PnL, etc)."""
-    market_map = await fetch_market_details()
+    market_map = await fetch_market_details(request.network)
     processed = []
     
     for trade in request.trades:
@@ -395,9 +403,9 @@ async def process_trades(request: ProcessTradesRequest):
 
 
 @app.get("/api/markets")
-async def get_markets():
+async def get_markets(network: Network = "core"):
     """Get cached market details."""
-    return {"markets": await fetch_market_details()}
+    return {"markets": await fetch_market_details(network)}
 
 
 # Static Files

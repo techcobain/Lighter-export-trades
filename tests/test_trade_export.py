@@ -28,6 +28,32 @@ SPOT = ["LIT/USDC", "Buy", "2026-09-19 15:30:50", "6.792350", "1.31",
 
 
 class TradeExportTests(unittest.TestCase):
+    def test_network_routes_and_credential_scope(self):
+        with TestClient(main.app) as client, patch("main.get_account_indexes", new_callable=AsyncMock, return_value=[42]) as lookup:
+            for network in ["core", "rh"]:
+                response = client.post("/api/lookup-accounts", json={"l1_address": "0x" + "1" * 40, "network": network})
+                self.assertEqual(response.status_code, 200)
+                lookup.assert_awaited_with("0x" + "1" * 40, network)
+            self.assertEqual(client.post("/api/lookup-accounts", json={"l1_address": "0x" + "1" * 40, "network": "unknown"}).status_code, 422)
+            policy = client.get("/").headers["content-security-policy"]
+            self.assertIn(main.API_BASES["core"], policy)
+            self.assertIn(main.API_BASES["rh"], policy)
+
+    def test_market_caches_are_separate_for_core_and_rh(self):
+        cache = {network: {"data": {}, "last_updated": 0} for network in main.API_BASES}
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.get.side_effect = [
+            httpx.Response(200, json={"order_book_details": [{"market_id": 1, "symbol": "CORE"}]}),
+            httpx.Response(200, json={"order_book_details": [{"market_id": 1, "symbol": "RH"}]}),
+        ]
+        with TestClient(main.app) as client, patch.object(main, "market_cache", cache), patch("main.httpx.AsyncClient", return_value=mock_client):
+            self.assertEqual(client.get("/api/markets?network=core").json()["markets"], {"1": "CORE"})
+            self.assertEqual(client.get("/api/markets?network=rh").json()["markets"], {"1": "RH"})
+            self.assertEqual(client.get("/api/markets?network=core").json()["markets"], {"1": "CORE"})
+            self.assertEqual(mock_client.get.await_count, 2)
+            self.assertEqual(mock_client.get.await_args_list[1].args[0], "https://api.rh.lighter.xyz/api/v1/orderBookDetails")
+
     def test_existing_columns_and_raw_export_rows(self):
         result = main.process_export_csv("\ufeff" + export_csv([PERP, SPOT]))
         self.assertEqual(result["total_trades"], 2)
@@ -75,6 +101,8 @@ class TradeExportTests(unittest.TestCase):
                 f"https://{main.EXPORT_DOWNLOAD_HOST}@evil.test/file.csv",
                 f"https://user@{main.EXPORT_DOWNLOAD_HOST}/file.csv",
                 f"https://{main.EXPORT_DOWNLOAD_HOST}:444/file.csv"]
+        urls.extend(["https://example.s3.ap-northeast-1.amazonaws.com/file.csv",
+                     "https://zklighter-mainnet-data-export.example.com/file.csv"])
         with TestClient(main.app) as client, patch("main.httpx.AsyncClient") as download:
             for url in urls:
                 with self.subTest(url=url):
