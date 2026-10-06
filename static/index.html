@@ -262,6 +262,23 @@
             letter-spacing: 0.08em;
         }
 
+        #connectCard > .card-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        @media (max-width: 600px) {
+            #connectCard > .card-title {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            #connectCard > .card-title > div {
+                margin-left: 0 !important;
+                flex-wrap: wrap;
+            }
+        }
+
         .card-title.collapsible {
             display: flex;
             justify-content: space-between;
@@ -1355,13 +1372,18 @@
             </div>
         </div>
 
-        <!-- Step 1: Lookup Accounts -->
-        <div class="card" id="step1Card">
-            <div class="card-title collapsible" onclick="toggleCardCollapse('step1Card')">
-                <span>Step 1: Lookup Accounts</span>
-                <span class="collapse-icon">▼</span>
+        <!-- Connect account -->
+        <div class="card" id="connectCard">
+            <div class="card-title">
+                <span>Connect Account</span>
+                <div style="display:flex; gap:8px; margin-left:auto;">
+                    <button class="btn-secondary" id="manualModeBtn" onclick="showConnectionMode('manual')">Manual connection</button>
+                    <button class="btn-primary" id="walletModeBtn" onclick="connectWallet()">Connect Wallet</button>
+                </div>
             </div>
-            <div class="card-content" id="step1CardContent">
+            <div class="card-content" id="connectCardContent">
+                <div id="connectIntro" style="color:var(--text-muted); font-size:0.85rem;">Choose how you want to connect your Lighter account.</div>
+                <div id="manualConnection" class="hidden">
                 <div class="form-group">
                     <label for="l1Address">L1 Address</label>
                     <input 
@@ -1375,23 +1397,14 @@
                     Lookup Accounts
                 </button>
                 <div id="lookupStatus" class="status"></div>
-            </div>
-        </div>
-
-        <!-- Step 2: Enter Read-Only Token -->
-        <div class="card hidden" id="step2Card">
-            <div class="card-title collapsible" onclick="toggleCardCollapse('step2Card')">
-                <span>Step 2: Enter Read-Only Token</span>
-                <span class="collapse-icon">▼</span>
-            </div>
-            <div class="card-content" id="step2CardContent">
+                <div id="manualTokenStep" class="hidden">
                 <p style="color: var(--text-muted); margin-bottom: 14px; font-size: 0.8rem; line-height: 1.5;">
                     Enter your read-only auth token. This single token will be used to fetch data from all selected accounts.
                     <br><br>
                     Generate a read-only token at <a href="https://app.lighter.xyz/read-only-tokens" target="_blank" style="color: var(--text-secondary);">app.lighter.xyz/read-only-tokens</a>
                 </p>
                 <div class="form-group">
-                    <label for="readOnlyToken">Read-Only Auth Token</label>
+                    <label for="readOnlyToken">Read-Only Token</label>
                     <input 
                         type="password" 
                         id="readOnlyToken" 
@@ -1400,16 +1413,19 @@
                     >
                 </div>
                 <button class="btn-primary" id="continueBtn" onclick="continueToAccountSelection()">
-                    Continue
+                    Connect account
                 </button>
                 <div id="tokenStatus" class="status"></div>
+                </div>
+                </div>
+                <div id="walletStatus" class="status"></div>
             </div>
         </div>
 
         <!-- Step 3: Select Accounts -->
         <div class="card hidden" id="step3Card">
             <div class="card-title collapsible" onclick="toggleCardCollapse('step3Card')">
-                <span>Step 3: Select Accounts & Fetch</span>
+                <span>Select accounts &amp; Export</span>
                 <span class="collapse-icon">▼</span>
             </div>
             <div class="card-content" id="step3CardContent">
@@ -1739,9 +1755,14 @@
             assetCache = {}; assetCacheTimestamp = 0;
             document.getElementById('readOnlyToken').value = '';
             document.getElementById('accountsList').innerHTML = '';
-            ['step2Card', 'step3Card', 'resultsCard', 'fundingCard', 'depositsCard', 'transfersCard', 'withdrawalsCard', 'poolsCard', 'stakingCard'].forEach(id => {
+            ['step3Card', 'resultsCard', 'fundingCard', 'depositsCard', 'transfersCard', 'withdrawalsCard', 'poolsCard', 'stakingCard'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
+            document.getElementById('manualConnection').classList.add('hidden');
+            document.getElementById('manualTokenStep').classList.add('hidden');
+            document.getElementById('connectIntro').classList.remove('hidden');
+            document.getElementById('l1Address').value = '';
+            hideStatus('walletStatus');
             ['tokenStatus', 'fetchStatus'].forEach(hideStatus);
             showStatus('lookupStatus', `Lighter ${network === 'core' ? 'Core' : 'RH'} selected. Look up your accounts and enter a token for this network.`, 'loading');
         }
@@ -1927,8 +1948,8 @@
                 accountIndexes = data.account_indexes;
                 showStatus('lookupStatus', `Found ${accountIndexes.length} account(s)`, 'success');
                 
-                // Show step 2 (read-only token input)
-                document.getElementById('step2Card').classList.remove('hidden');
+                document.getElementById('manualTokenStep').classList.remove('hidden');
+                document.getElementById('readOnlyToken').focus();
 
             } catch (error) {
                 showStatus('lookupStatus', `Error: ${error.message}`, 'error');
@@ -1959,6 +1980,122 @@
             // Build account selection UI
             buildAccountsList();
             document.getElementById('step3Card').classList.remove('hidden');
+        }
+
+        function showConnectionMode(mode) {
+            const manual = mode === 'manual';
+            document.getElementById('connectIntro').classList.toggle('hidden', manual);
+            document.getElementById('manualConnection').classList.toggle('hidden', !manual);
+            if (manual) document.getElementById('l1Address').focus();
+        }
+
+        const LIGHTER_CHAIN_ID = 304;
+        let walletAddress = null;
+
+        async function lighterCall(name, ...args) {
+            const fn = window[name];
+            if (!fn) throw new Error(`Lighter signer function ${name} is unavailable`);
+            const result = await fn(...args)();
+            if (result && result.error) throw new Error(result.error);
+            return result;
+        }
+
+        async function loadLighterSigner() {
+            if (window._createClient) return;
+            if (!window.Go) await new Promise((resolve, reject) => {
+                const script = document.createElement('script'); script.src = '/static/wasm_exec.js'; script.onload = resolve; script.onerror = () => reject(new Error('Could not load Lighter signer runtime')); document.head.appendChild(script);
+            });
+            if (!window.Go) throw new Error('Lighter signer runtime unavailable');
+            const go = new window.Go();
+            const response = await fetch('/static/lighter-signer.wasm');
+            if (!response.ok) throw new Error('Could not load Lighter signer');
+            const bytes = await response.arrayBuffer();
+            const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
+            void go.run(instance);
+            const start = Date.now();
+            while (!window._createClient) {
+                if (Date.now() - start > 15000) throw new Error('Lighter signer did not start');
+                await new Promise(resolve => setTimeout(resolve, 25));
+            }
+        }
+
+        async function lighterRequest(path, options = {}) {
+            const response = await fetch(`${LIGHTER_API}/api/v1${path}`, options);
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok || (body.code !== undefined && body.code !== 200 && body.code !== 0)) {
+                throw new Error(body.message || `Lighter API error (${response.status})`);
+            }
+            return body;
+        }
+
+        async function connectWallet() {
+            const button = document.getElementById('walletModeBtn');
+            const provider = window.ethereum;
+            if (!provider) { showStatus('walletStatus', 'No EVM wallet detected. Install or open this page in a wallet, or use Manual connection.', 'error'); return; }
+            button.disabled = true;
+            try {
+                showStatus('walletStatus', 'Connect your wallet to find your Lighter accounts…', 'loading');
+                const addresses = await provider.request({ method: 'eth_requestAccounts' });
+                walletAddress = addresses && addresses[0];
+                if (!walletAddress) throw new Error('Wallet did not return an address');
+                const lookup = await fetch('/api/lookup-accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ l1_address: walletAddress, network: selectedNetwork }) });
+                const accountData = await lookup.json();
+                if (!lookup.ok) throw new Error(accountData.detail || 'Could not find Lighter accounts for this wallet');
+                accountIndexes = accountData.account_indexes || [];
+                if (!accountIndexes.length) throw new Error('No Lighter accounts found for this wallet');
+                const accountIndex = Number(accountIndexes[0]);
+                const slotStorageKey = `lighter-export-key-slot:${selectedNetwork}:${accountIndex}`;
+                let apiKeyIndex = Number(sessionStorage.getItem(slotStorageKey));
+                if (!Number.isInteger(apiKeyIndex) || apiKeyIndex < 0) {
+                    const existingSlots = await lighterRequest(`/apikeys?account_index=${accountIndex}&api_key_index=255`);
+                    const occupied = new Set((existingSlots.api_keys || []).map(key => Number(key.api_key_index)));
+                    apiKeyIndex = [250, 251, 252, 253, 254].find(slot => !occupied.has(slot));
+                    if (apiKeyIndex === undefined) throw new Error('No free Lighter API-key slots are available for the wallet connection.');
+                    sessionStorage.setItem(slotStorageKey, String(apiKeyIndex));
+                }
+                showStatus('walletStatus', `Preparing read-only access for account ${accountIndex}…`, 'loading');
+                await loadLighterSigner();
+                const nonceData = await lighterRequest(`/nextNonce?account_index=${accountIndex}&api_key_index=${apiKeyIndex}`);
+                const nonce = Number(nonceData.nonce);
+                const message = ['Lighter Export', '', 'Sign this message to create a read-only API token for exporting your Lighter account history. This signature derives an L2 API key used only to create the read-only token.', '', `Account index: ${accountIndex}`, `API key index: ${apiKeyIndex}`, `Lighter chain: ${LIGHTER_CHAIN_ID}`, '', 'Signing does not send a transaction or cost gas. The only transaction submitted is an L2 API-key registration.'].join('\n');
+                showStatus('walletStatus', 'Sign the read-only access message in your wallet…', 'loading');
+                const seed = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
+                const derived = await lighterCall('_createClient', seed, LIGHTER_CHAIN_ID, accountIndex, nonce, apiKeyIndex);
+                if (!derived.pubKeySuccess || !derived.body) throw new Error('Could not derive Lighter API key');
+                const existing = await lighterRequest(`/apikeys?account_index=${accountIndex}&api_key_index=${apiKeyIndex}`).catch(() => null);
+                const currentKey = existing?.api_keys?.find(key => Number(key.api_key_index) === apiKeyIndex);
+                if (!currentKey || currentKey.public_key.replace(/^0x/, '').toLowerCase() !== derived.pk.replace(/^0x/, '').toLowerCase()) {
+                    showStatus('walletStatus', 'Sign the L2 API-key registration in your wallet…', 'loading');
+                    const l1Signature = await provider.request({ method: 'personal_sign', params: [derived.body, walletAddress] });
+                    const tx = await lighterCall('_signChangePubKey', accountIndex, l1Signature, nonce, apiKeyIndex);
+                    const txForm = new URLSearchParams({ tx_type: '8', tx_info: tx.txInfo });
+                    await lighterRequest('/sendTx', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: txForm.toString() });
+                    const until = Date.now() + 60000;
+                    let registered = false;
+                    while (Date.now() < until) {
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        const keys = await lighterRequest(`/apikeys?account_index=${accountIndex}&api_key_index=${apiKeyIndex}`).catch(() => null);
+                        registered = keys?.api_keys?.some(key => Number(key.api_key_index) === apiKeyIndex && key.public_key.replace(/^0x/, '').toLowerCase() === derived.pk.replace(/^0x/, '').toLowerCase());
+                        if (registered) break;
+                    }
+                    if (!registered) throw new Error('L2 API-key registration is still processing. Please try Connect Wallet again shortly.');
+                }
+                const auth = await lighterCall('_createAuthToken', accountIndex, apiKeyIndex);
+                showStatus('walletStatus', 'Creating your read-only token…', 'loading');
+                const expiry = Math.floor(Date.now() / 1000) + 10 * 365 * 24 * 60 * 60;
+                const form = new URLSearchParams({ name: 'Lighter Export', account_index: String(accountIndex), expiry: String(expiry), sub_account_access: 'true', scopes: 'read.*' });
+                const tokenData = await lighterRequest('/tokens/create', { method: 'POST', headers: { authorization: auth.token, 'content-type': 'application/x-www-form-urlencoded' }, body: form.toString() });
+                if (!tokenData.api_token) throw new Error(tokenData.message || 'Lighter did not return a read-only token');
+                readOnlyToken = tokenData.api_token;
+                document.getElementById('l1Address').value = walletAddress;
+                document.getElementById('readOnlyToken').value = readOnlyToken;
+                buildAccountsList();
+                document.getElementById('step3Card').classList.remove('hidden');
+                showStatus('walletStatus', 'Wallet connected and read-only token created. Select accounts below to export.', 'success');
+                document.getElementById('networkToggle').disabled = true;
+            } catch (error) {
+                showStatus('walletStatus', `Error: ${error.message || error}`, 'error');
+            } finally { button.disabled = false; }
         }
 
         // Build accounts list with checkboxes only
