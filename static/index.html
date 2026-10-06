@@ -1,81 +1,95 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>Lighter Trades Fetcher</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <meta name="description" content="Export your Lighter trading and account history." />
+    <title>Data Export | Lighter</title>
+    <link rel="preload" href="/static/fonts/Inter.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/static/fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin>
     <script>
         (function () {
             try {
-                if (localStorage.getItem('lighter-theme') === 'dark') {
-                    document.documentElement.dataset.theme = 'dark';
-                }
+                document.documentElement.dataset.theme = localStorage.getItem('lighter-theme') || 'dark';
             } catch (error) {}
         })();
     </script>
     <style>
+        @font-face {
+            font-family: 'Inter Variable';
+            src: url('/static/fonts/Inter.woff2') format('woff2');
+            font-style: normal;
+            font-weight: 100 900;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'Geist Mono';
+            src: url('/static/fonts/GeistMono.woff2') format('woff2');
+            font-style: normal;
+            font-weight: 100 900;
+            font-display: swap;
+        }
+
         :root {
             color-scheme: dark;
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-tertiary: #1a1a25;
-            --text-primary: #f0f0f5;
-            --text-secondary: #9090a0;
-            --text-muted: #606070;
-            --border: #2a2a35;
-            --accent: #4a6a9a;
-            --accent-dim: #3d577a;
-            --accent-alt: #5aad69;
-            --error: #ef4444;
-            --success: #5aad69;
-            --warning: #f59e0b;
-            --bid-color: #4a7c59;
-            --ask-color: #8a5a5a;
+            --bg-primary: #06060c;
+            --bg-secondary: #19181f;
+            --bg-tertiary: #222128;
+            --text-primary: #f5f5f6;
+            --text-secondary: #b8b7bf;
+            --text-muted: #a3a2aa;
+            --border: rgba(255, 255, 255, 0.07);
+            --accent: #b5c7ff;
+            --accent-dim: #91a9ed;
+            --accent-alt: #37d996;
+            --error: #f27676;
+            --success: #43d99b;
+            --warning: #f3c65e;
+            --bid-color: #43d99b;
+            --ask-color: #f27676;
             --panel-gradient: linear-gradient(
                 135deg,
-                rgba(26, 26, 37, 0.95) 0%,
-                rgba(18, 18, 26, 0.98) 100%
+                rgba(255, 255, 255, 0.055) 0%,
+                rgba(255, 255, 255, 0.025) 100%
             );
-            --page-glow-primary: rgba(74, 106, 154, 0.03);
-            --page-glow-secondary: rgba(90, 173, 105, 0.02);
-            --hover-bg: rgba(255, 255, 255, 0.02);
-            --row-border: rgba(42, 42, 53, 0.5);
-            --tooltip-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            --calendar-icon-filter: invert(0.6);
-            --selection-text: #f0f0f5;
+            --page-glow-primary: rgba(255, 255, 255, 0.012);
+            --page-glow-secondary: rgba(255, 255, 255, 0.008);
+            --hover-bg: rgba(255, 255, 255, 0.035);
+            --row-border: rgba(255, 255, 255, 0.07);
+            --tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --calendar-icon-filter: invert(0.75);
+            --selection-text: #06060c;
         }
 
         :root[data-theme="light"] {
             color-scheme: light;
-            --bg-primary: #f5f7fb;
+            --bg-primary: #ffffff;
             --bg-secondary: #ffffff;
-            --bg-tertiary: #eef2f7;
-            --text-primary: #172033;
-            --text-secondary: #4b5568;
-            --text-muted: #737f93;
-            --border: #d7deea;
-            --accent: #315f9d;
-            --accent-dim: #254a7f;
-            --accent-alt: #258b57;
-            --error: #c63d3d;
-            --success: #258b57;
-            --warning: #b7791f;
-            --bid-color: #24744a;
-            --ask-color: #b45256;
+            --bg-tertiary: #f1f1f3;
+            --text-primary: #202126;
+            --text-secondary: #4d4d54;
+            --text-muted: #707078;
+            --border: rgba(6, 6, 12, 0.1);
+            --accent: #3156bf;
+            --accent-dim: #25449b;
+            --accent-alt: #087d57;
+            --error: #c43d4d;
+            --success: #087d57;
+            --warning: #8a5a00;
+            --bid-color: #087d57;
+            --ask-color: #c43d4d;
             --panel-gradient: linear-gradient(
                 135deg,
-                rgba(255, 255, 255, 0.98) 0%,
-                rgba(246, 248, 252, 0.96) 100%
+                rgba(0, 0, 0, 0.018) 0%,
+                rgba(0, 0, 0, 0.008) 100%
             );
-            --page-glow-primary: rgba(49, 95, 157, 0.09);
-            --page-glow-secondary: rgba(37, 139, 87, 0.06);
-            --hover-bg: rgba(49, 95, 157, 0.06);
-            --row-border: rgba(215, 222, 234, 0.72);
-            --tooltip-shadow: 0 10px 28px rgba(23, 32, 51, 0.16);
+            --page-glow-primary: rgba(6, 6, 12, 0.015);
+            --page-glow-secondary: rgba(6, 6, 12, 0.01);
+            --hover-bg: rgba(6, 6, 12, 0.035);
+            --row-border: rgba(6, 6, 12, 0.075);
+            --tooltip-shadow: 0 8px 24px rgba(6, 6, 12, 0.12);
             --calendar-icon-filter: invert(0.35);
             --selection-text: #ffffff;
         }
@@ -87,11 +101,16 @@
         }
 
         body {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Inter Variable', Inter, system-ui, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+            font-size: 12px;
+            font-optical-sizing: auto;
+            font-feature-settings: 'case' 1, 'calt' 1, 'cv11' 1, 'cv05' 1, 'cv02' 1, 'cv03' 1, 'cv04' 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             transition: background 0.2s ease, color 0.2s ease;
         }
 
@@ -113,7 +132,8 @@
             height: 400px;
             background: var(--page-glow-primary);
             border-radius: 50%;
-            filter: blur(80px);
+            filter: blur(100px);
+            opacity: 0.45;
         }
 
         .bg-gradients::after {
@@ -125,7 +145,8 @@
             height: 350px;
             background: var(--page-glow-secondary);
             border-radius: 50%;
-            filter: blur(80px);
+            filter: blur(100px);
+            opacity: 0.45;
         }
 
         /* Glass panel design */
@@ -133,8 +154,8 @@
             background: var(--panel-gradient);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            border: 0.5px solid var(--border);
+            border-radius: 8px;
         }
 
         .glow-accent {
@@ -146,7 +167,7 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1120px;
             margin: 0 auto;
             padding: 32px 16px;
             position: relative;
@@ -154,21 +175,87 @@
         }
 
         header {
-            margin-bottom: 32px;
+            margin-bottom: 36px;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             gap: 16px;
         }
 
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-height: 24px;
+        }
+
+        .brand-mark {
+            width: 72px;
+            height: 22px;
+            display: block;
+            background: var(--text-primary);
+            -webkit-mask: url('/static/lighter-wordmark.svg') center / contain no-repeat;
+            mask: url('/static/lighter-wordmark.svg') center / contain no-repeat;
+        }
+
+        .brand-divider {
+            width: 1px;
+            height: 18px;
+            background: var(--border);
+        }
+
+        .brand-caption, .eyebrow {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .page-intro {
+            position: relative;
+            margin: 0 0 24px;
+            padding: 24px 26px;
+            overflow: hidden;
+            border: 0.5px solid var(--border);
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--hover-bg), transparent 72%);
+        }
+
+        .page-intro::before, .page-intro::after {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            content: '';
+            border-color: var(--text-muted);
+            opacity: 0.4;
+        }
+
+        .page-intro::before {
+            top: 5px;
+            left: 5px;
+            border-top: 1px solid;
+            border-left: 1px solid;
+        }
+
+        .page-intro::after {
+            right: 5px;
+            bottom: 5px;
+            border-right: 1px solid;
+            border-bottom: 1px solid;
+        }
+
+        .page-intro .eyebrow { margin-bottom: 12px; }
+        .page-intro .subtitle { max-width: 62ch; }
+
         h1 {
-            font-size: 1.3rem;
-            font-weight: 600;
+            font-size: clamp(1.8rem, 4vw, 2.7rem);
+            font-weight: 500;
             color: var(--text-primary);
             margin-bottom: 6px;
-            letter-spacing: 0.08em;
-            font-family: 'JetBrains Mono', monospace;
-            text-transform: uppercase;
+            letter-spacing: -0.035em;
+            font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+            text-transform: none;
         }
 
         h1 span {
@@ -177,8 +264,9 @@
 
         .subtitle {
             color: var(--text-muted);
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             font-weight: 400;
+            line-height: 1.7;
         }
 
         .header-controls {
@@ -234,8 +322,8 @@
         }
 
         .theme-switch input:checked + .theme-switch-track {
-            background: rgba(49, 95, 157, 0.12);
-            border-color: rgba(49, 95, 157, 0.42);
+            background: var(--hover-bg);
+            border-color: var(--text-muted);
         }
 
         .theme-switch input:checked + .theme-switch-track .theme-switch-thumb {
@@ -247,19 +335,20 @@
             background: var(--panel-gradient);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            border: 0.5px solid var(--border);
+            border-radius: 8px;
             padding: 24px;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
             margin-bottom: 16px;
         }
 
         .card-title {
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 16px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
+            text-transform: none;
+            letter-spacing: -0.015em;
         }
 
         #connectCard > .card-title {
@@ -333,19 +422,21 @@
 
         input {
             width: 100%;
-            padding: 12px 14px;
+            height: 40px;
+            padding: 0 12px;
             background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            border: 0.5px solid var(--border);
+            border-radius: 6px;
             color: var(--text-primary);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            transition: border-color 0.2s;
+            font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+            font-size: 0.9rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         input:focus {
             outline: none;
-            border-color: var(--accent);
+            border-color: var(--text-muted);
+            box-shadow: 0 0 0 2px var(--hover-bg);
         }
 
         input::placeholder {
@@ -367,14 +458,16 @@
                 align-items: flex-start;
                 flex-direction: column;
             }
+            .page-intro { padding: 20px; }
         }
 
         button {
-            padding: 10px 18px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
+            min-height: 40px;
+            padding: 0 14px;
+            border: 0.5px solid var(--border);
+            border-radius: 6px;
+            font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+            font-size: 0.85rem;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
@@ -387,24 +480,27 @@
         }
 
         .btn-primary {
-            background: rgba(74, 106, 154, 0.15);
-            color: var(--accent);
-            border-color: rgba(74, 106, 154, 0.4);
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: transparent;
+            box-shadow: inset 0 0 0 0.5px rgba(6, 6, 12, 0.1), 0 0 0 0.5px var(--border);
         }
 
         .btn-primary:hover:not(:disabled) {
-            background: rgba(74, 106, 154, 0.25);
-            border-color: var(--accent);
+            background: var(--text-secondary);
+            border-color: transparent;
         }
 
         .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
+            background: var(--hover-bg);
+            color: var(--text-primary);
+            border: 0.5px solid var(--border);
+            box-shadow: 0 0 0 0.5px var(--border), 0 1px 0 var(--hover-bg);
         }
 
         .btn-secondary:hover:not(:disabled) {
-            border-color: var(--text-muted);
+            background: var(--hover-bg);
+            border-color: var(--border);
         }
 
         .btn-small {
@@ -759,7 +855,7 @@
             border: 1px solid var(--border);
             border-radius: 4px;
             color: var(--text-primary);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Inter Variable', Inter, system-ui, sans-serif;
             font-size: 0.75rem;
             min-width: 140px;
         }
@@ -882,7 +978,7 @@
             max-height: 450px;
             overflow-y: auto;
             overflow-x: auto;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Geist Mono', ui-monospace, monospace;
             font-size: 0.7rem;
             line-height: 1.5;
         }
@@ -1286,9 +1382,10 @@
     <div class="bg-gradients"></div>
     <div class="container">
         <header>
-            <div>
-                <h1><span>LIGHTER</span> EXPORT TRADING DATA</h1>
-                <p class="subtitle">Export trading, wallet, public pool, and staking history</p>
+            <div class="brand-lockup">
+                <a href="https://lighter.xyz" target="_blank" rel="noreferrer" class="brand-mark" aria-label="Lighter"></a>
+                <span class="brand-divider"></span>
+                <span class="brand-caption">Data export</span>
             </div>
             <div class="header-controls">
                 <label class="theme-switch" for="networkToggle">
@@ -1307,6 +1404,12 @@
                 </label>
             </div>
         </header>
+
+        <section class="page-intro">
+            <p class="eyebrow">Lighter · account tools</p>
+            <h1>Export your Lighter data</h1>
+            <p class="subtitle">Download trading, funding, transfer, deposit, withdrawal, public pool, and staking history.</p>
+        </section>
 
         <!-- FAQ Section -->
         <div class="faq-section">
@@ -1724,9 +1827,9 @@
         }
 
         function initTheme() {
-            let savedTheme = 'light';
+            let savedTheme = 'dark';
             try {
-                savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
+                savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
             } catch (error) {}
             applyTheme(savedTheme);
         }
