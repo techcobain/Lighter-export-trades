@@ -110,12 +110,12 @@ function appContext() {
     return { context, element, blobs };
 }
 
-test('presets use UTC calendar dates and the 2025 preset starts at genesis', () => {
+test('presets use UTC calendar dates and 2025 requests start at mainnet genesis', () => {
     const { context, element } = appContext();
     for (const [preset, start, end] of [
         ['7D', '2026-09-29', '2026-10-05'], ['30D', '2026-09-06', '2026-10-05'],
         ['90D', '2026-07-08', '2026-10-05'], ['2026', '2026-01-01', '2026-10-05'],
-        ['2025', '2025-01-17', '2025-12-31'],
+        ['2025', '2025-01-01', '2025-12-31'],
     ]) {
         vm.runInContext(`selectTimeframePreset('${preset}')`, context);
         assert.equal(element('dateFrom').value, start);
@@ -123,7 +123,7 @@ test('presets use UTC calendar dates and the 2025 preset starts at genesis', () 
         assert.equal(element('includeHours').checked, false);
         assert.equal(element(`[data-preset="${preset}"]`)['aria-pressed'], 'true');
         const range = vm.runInContext('getTimeframeParams()', context);
-        assert.equal(range.fromTimestamp, Date.parse(start + 'T00:00:00.000Z'));
+        assert.equal(range.fromTimestamp, Math.max(Date.parse(start + 'T00:00:00.000Z'), Date.UTC(2025, 0, 17)));
         assert.equal(range.toTimestamp, Date.parse(end + 'T23:59:59.999Z'));
     }
     vm.runInContext('clearTimeframePreset()', context);

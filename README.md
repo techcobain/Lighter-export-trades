@@ -9,7 +9,7 @@ A web app to fetch and export trading data from [Lighter Exchange](https://light
 - **Multi-account support** — Fetch data from multiple sub-accounts simultaneously
 - **Read-only tokens** — Uses secure read-only auth tokens (can't trade or withdraw)
 - **Custom timeframes** — Export complete history or select specific date ranges
-- **Quick timeframes** — 7D, 30D, 90D, 2026, and 2025 presets in UTC; 2025 starts at January 17 mainnet genesis
+- **Quick timeframes** — 7D, 30D, 90D, 2026, and 2025 presets in UTC; the 2025 preset displays January 1 while requests start at January 17 mainnet genesis
 - **Spot & Perp filtering** — Filter trades by market type (Perpetuals, Spot)
 - **Transfer filtering** — Filter by type (Incoming, Outgoing, Internal, Pool Mint/Burn)
 - **Customizable columns** — Choose which fields to display and export

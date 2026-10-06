@@ -407,6 +407,21 @@
             flex-wrap: wrap;
         }
 
+        .fetch-actions {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .fetch-actions .btn-primary {
+            flex: 0 0 auto;
+            padding: 8px 10px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+
         .status {
             margin-top: 16px;
             padding: 12px 14px;
@@ -602,7 +617,16 @@
             display: flex;
             gap: 8px;
             margin-bottom: 12px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .timeframe-options > * {
+            flex: 0 0 auto;
+            white-space: nowrap;
         }
 
         .timeframe-option {
@@ -1416,7 +1440,7 @@
                         <button type="button" class="timeframe-option timeframe-preset" data-preset="30D" aria-pressed="false" onclick="selectTimeframePreset('30D')">30D</button>
                         <button type="button" class="timeframe-option timeframe-preset" data-preset="90D" aria-pressed="false" onclick="selectTimeframePreset('90D')">90D</button>
                         <button type="button" class="timeframe-option timeframe-preset" data-preset="2026" aria-pressed="false" onclick="selectTimeframePreset('2026')">2026</button>
-                        <button type="button" class="timeframe-option timeframe-preset" data-preset="2025" aria-pressed="false" title="Starts January 17, 2025 (mainnet genesis)" onclick="selectTimeframePreset('2025')">2025</button>
+                        <button type="button" class="timeframe-option timeframe-preset" data-preset="2025" aria-pressed="false" title="Shows January 1; fetched data starts January 17, 2025 (mainnet genesis)" onclick="selectTimeframePreset('2025')">2025</button>
                     </div>
                     <div class="date-range-inputs" id="dateRangeInputs">
                         <div class="date-input-group">
@@ -1446,7 +1470,7 @@
                     </div>
                 </div>
                 
-                <div class="btn-group" style="flex-wrap: wrap;">
+                <div class="btn-group fetch-actions">
                     <button class="btn-primary" id="fetchTradesBtn" onclick="fetchTrades()">
                         Fetch Trades
                     </button>
@@ -2051,7 +2075,7 @@
                 from = new Date(Date.parse(today + 'T00:00:00Z') - (days - 1) * 86400000).toISOString().slice(0, 10);
                 to = today;
             } else {
-                from = preset === '2025' ? '2025-01-17' : `${preset}-01-01`;
+                from = `${preset}-01-01`;
                 to = `${preset}-12-31` < today ? `${preset}-12-31` : today;
             }
             document.getElementById('dateFrom').value = from;
@@ -2115,6 +2139,9 @@
                 toTimestamp = new Date(`${dateToInput.value}T23:59:59.999Z`).getTime();
             }
             
+            // Mainnet history begins at genesis. Keep user-entered and preset dates visible,
+            // while starting every data request at the first supported timestamp.
+            fromTimestamp = Math.max(fromTimestamp, Date.UTC(2025, 0, 17));
             return { fromTimestamp, toTimestamp };
         }
         
