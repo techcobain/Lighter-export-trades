@@ -17,7 +17,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from account_statements import StatementError, build_report, report_csv, report_pdf
 
 # Configuration
 BASE_URL = "https://mainnet.zklighter.elliot.ai"
@@ -34,6 +35,8 @@ ENDPOINT_RATE_LIMITS = {
     "/api/process-trades": {"requests": 30, "window": 60},
     "/api/process-trades-export": {"requests": 30, "window": 60},
     "/api/process-fundings-export": {"requests": 30, "window": 60},
+    "/api/account-statements": {"requests": 10, "window": 60},
+    "/api/account-statements/export": {"requests": 20, "window": 60},
 }
 
 
@@ -55,6 +58,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        if request.url.path.startswith("/api/account-statements"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 
@@ -114,6 +119,37 @@ class ProcessTradesRequest(BaseModel):
 
 class ProcessExportRequest(BaseModel):
     data_url: str
+
+
+class StatementCutoff(BaseModel):
+    label: str = Field(min_length=1, max_length=120)
+    timestamp_ms: int
+
+
+class AccountStatementsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    network: Network
+    account_index: int
+    snapshot_at_ms: int
+    snapshot: dict
+    snapshot_after: dict
+    cutoffs: list[StatementCutoff] = Field(min_length=1, max_length=36)
+    asset_details: list[dict]
+    markets: list[dict]
+    trades: list[dict] = Field(max_length=1_000_000)
+    spot_trades: list[dict] = Field(default_factory=list, max_length=3000)
+    perp_trades: list[dict] = Field(default_factory=list, max_length=3000)
+    outflow_checks: list[dict] = Field(default_factory=list, max_length=100_000)
+    fundings: list[dict] = Field(max_length=1_000_000)
+    deposits: list[dict] = Field(max_length=100_000)
+    transfers: list[dict] = Field(max_length=100_000)
+    withdrawals: list[dict] = Field(max_length=100_000)
+    leases: list[dict] = Field(default_factory=list, max_length=100_000)
+
+
+class StatementExportRequest(BaseModel):
+    report: dict
+    format: Literal["pdf", "csv"]
 
 
 class TradeData(BaseModel):
@@ -419,6 +455,38 @@ async def process_trades_export(request: ProcessExportRequest):
 @app.post("/api/process-fundings-export")
 async def process_fundings_export(request: ProcessExportRequest):
     return await download_export(request, process_funding_export_csv, "funding")
+
+
+@app.post("/api/account-statements")
+async def account_statements(request: AccountStatementsRequest):
+    try:
+        return {"success": True, "report": await build_report(request.model_dump())}
+    except StatementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Historical prices could not be downloaded. Please retry.") from None
+    except (KeyError, ValueError, TypeError, ArithmeticError):
+        raise HTTPException(status_code=400, detail="Statement source data is incomplete or invalid.") from None
+
+
+@app.post("/api/account-statements/export")
+def export_account_statements(request: StatementExportRequest):
+    report = request.report
+    try:
+        if not 1 <= len(report["statements"]) <= 36 or any(
+                len(s["assets"]) + len(s["positions"]) > 500 for s in report["statements"]):
+            raise ValueError("Invalid report size")
+        # Validate metadata used in filenames/footers; paragraph content is XML escaped.
+        network = report["network"]
+        if network not in API_BASES:
+            raise ValueError("Invalid network")
+        account = int(report["account_index"])
+        filename = f"lighter_statements_{network}_account_{account}.{request.format}"
+        content = report_pdf(report) if request.format == "pdf" else report_csv(report).encode("utf-8")
+    except (KeyError, ValueError, TypeError, ArithmeticError):
+        raise HTTPException(status_code=400, detail="Statement report is incomplete or invalid.") from None
+    return Response(content, media_type="application/pdf" if request.format == "pdf" else "text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
 
 
 @app.post("/api/lookup-accounts")

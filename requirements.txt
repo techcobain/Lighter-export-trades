@@ -11,3 +11,5 @@ httpx==0.27.2
 # For serving static files
 aiofiles==24.1.0
 
+# Monthly, annual and custom-date statement PDFs
+reportlab==4.4.10

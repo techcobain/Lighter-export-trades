@@ -106,6 +106,7 @@ function appContext() {
     };
     const html = fs.readFileSync(path.resolve(__dirname, '../static/index.html'), 'utf8');
     const appSource = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+    vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../static/account-statements.js'), 'utf8'), context);
     vm.runInContext(appSource.slice(0, appSource.indexOf('// Initialize on page load')), context);
     return { context, element, blobs };
 }

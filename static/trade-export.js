@@ -22,6 +22,7 @@ const LighterTradeExport = (() => {
         return fetchData(options, {
             type: 'funding', label: 'funding', plural: 'fundings', raw: 'raw_fundings',
             maxWindow: 90 * 24 * 60 * 60 * 1000,
+            sides: ['long', 'short'],
             key: fundingKey, rawKey: rawFundingKey,
         });
     }
@@ -62,7 +63,7 @@ const LighterTradeExport = (() => {
             }
         }
 
-        async function fetchRange(rangeStart, rangeEnd) {
+        async function fetchRange(rangeStart, rangeEnd, side) {
             if (requestCount > 0) await wait(REQUEST_DELAY_MS);
             requestCount++;
             const dates = [rangeStart, rangeEnd].map(ms => new Date(ms).toISOString().slice(0, 10));
@@ -74,6 +75,7 @@ const LighterTradeExport = (() => {
                 start_timestamp: rangeStart,
                 end_timestamp: rangeEnd,
             });
+            if (side) params.set('side', side);
             const exported = await requestJSON(`${apiBase}/api/v1/export?${params}`, {
                 headers: { Authorization: authToken },
             }, true);
@@ -95,8 +97,8 @@ const LighterTradeExport = (() => {
                 if (middle <= rangeStart || middle >= rangeEnd) {
                     throw new Error(`Too many ${config.plural} in a single millisecond to export completely.`);
                 }
-                await fetchRange(rangeStart, middle);
-                await fetchRange(middle, rangeEnd);
+                await fetchRange(rangeStart, middle, side);
+                await fetchRange(middle, rangeEnd, side);
                 return;
             }
             if (!Array.isArray(processed[config.plural]) || !Array.isArray(processed[config.raw])
@@ -110,7 +112,8 @@ const LighterTradeExport = (() => {
         let rangeEnd = end;
         while (true) {
             const rangeStart = Math.max(start, rangeEnd - config.maxWindow);
-            await fetchRange(rangeStart, rangeEnd);
+            // The live funding API returns incomplete payments for side=all. Request each side explicitly.
+            for (const side of config.sides || [null]) await fetchRange(rangeStart, rangeEnd, side);
             if (rangeStart === start) break;
             rangeEnd = rangeStart;
         }

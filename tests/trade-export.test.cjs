@@ -89,6 +89,7 @@ test('funding uses 90-day ranges on Core and RH and deduplicates only matching p
                 assert.equal(parsed.searchParams.get('type'), 'funding');
                 assert.equal(parsed.searchParams.get('account_index'), '42');
                 assert.equal(options.headers.Authorization, 'ro:test-only');
+                assert.equal(parsed.searchParams.get('side'), count % 2 ? 'short' : 'long');
                 ranges.push([Number(parsed.searchParams.get('start_timestamp')), Number(parsed.searchParams.get('end_timestamp'))]);
                 count++;
                 return response({ code: 200, data_url: 'https://storage.test/file' });
@@ -105,11 +106,11 @@ test('funding uses 90-day ranges on Core and RH and deduplicates only matching p
         }, 'fetchFundings');
         const end = genesis + fundingWindow * 2 + 1;
         const result = await exporter.run({ apiBase, fromTimestamp: genesis - 1000, toTimestamp: end });
-        assert.deepEqual(ranges, [[end - fundingWindow, end], [end - 2 * fundingWindow, end - fundingWindow], [genesis, end - 2 * fundingWindow]]);
-        assert.equal(result.fundings.length, 6);
-        assert.equal(result.raw_fundings.length, 6);
+        assert.deepEqual(ranges, [[end - fundingWindow, end], [end - fundingWindow, end], [end - 2 * fundingWindow, end - fundingWindow], [end - 2 * fundingWindow, end - fundingWindow], [genesis, end - 2 * fundingWindow], [genesis, end - 2 * fundingWindow]]);
+        assert.equal(result.fundings.length, 9);
+        assert.equal(result.raw_fundings.length, 9);
         assert.equal(result.fundings[0].rate_percent, '0.000004');
-        assert.deepEqual(exporter.sleeps, [3500, 3500]);
+        assert.deepEqual(exporter.sleeps, [3500, 3500, 3500, 3500, 3500]);
     }
 });
 
@@ -121,8 +122,8 @@ test('funding splits capped ranges and rejects failed later exports', async () =
         return response(count === 1 ? { success: true, limit_reached: true }
             : processedFunding([['TTWO', 'long', `2025-01-2${count} 16:00:00`]]));
     }, 'fetchFundings');
-    assert.equal((await exporter.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 })).fundings.length, 2);
-    assert.equal(count, 3);
+    assert.equal((await exporter.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 })).fundings.length, 3);
+    assert.equal(count, 4);
     let exports = 0;
     const failed = createExporter(url => {
         if (!url.startsWith('https://')) return response(processedFunding([['TTWO', 'long', '2025-01-20 16:00:00']]));
@@ -135,7 +136,7 @@ test('funding handles empty exports and bounded rate-limit retries', async () =>
     let count = 0;
     const exporter = createExporter(() => ++count === 1 ? response({}, 429, '2') : response({ code: 22504 }, 400), 'fetchFundings');
     assert.equal((await exporter.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 })).fundings.length, 0);
-    assert.deepEqual(exporter.sleeps, [2000]);
+    assert.deepEqual(exporter.sleeps, [2000, 3500]);
     const failed = createExporter(() => response({}, 405), 'fetchFundings');
     await assert.rejects(failed.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 }), /HTTP 405/);
     assert.equal(failed.calls.length, 6);

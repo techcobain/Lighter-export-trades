@@ -4,6 +4,7 @@ A web app to fetch and export trading data from [Lighter Exchange](https://light
 
 ## Features
 
+- **Account statements** — Monthly, year-end, or custom UTC cutoffs with PDF, CSV and JSON downloads
 - **7 Data Types** — Trades, Funding, Deposits, Transfers, Withdrawals, Public Pools, Staking
 - **Core & RH** — Switch between Lighter Core and Lighter RH beside the theme selector
 - **Multi-account support** — Fetch data from multiple sub-accounts simultaneously
@@ -62,7 +63,17 @@ Pool and staking events have separate result tables, account tabs, CSV downloads
 
 Trade exports use non-aggregated fills and automatically split history into ranges of at most 180 days. Ranges reaching Lighter's one-million-row export limit are split further, and overlapping boundaries are deduplicated by trade ID. The table, column selection, filters, CSV format, and JSON envelope remain the same. JSON trade records now contain the raw export CSV fields. Transaction hashes are blank because Lighter's export does not include them. Spot trades use Lighter's Buy/Sell labels.
 
-Funding exports use ranges of at most 90 days and split further if an export reaches the row limit. Payments at overlapping boundaries are deduplicated by market, side, and UTC timestamp because the export has no funding ID. The funding table and CSV columns remain the same; rates retain the export's percentage precision. JSON retains the `position_fundings` envelope and contains the raw funding export CSV fields (`Market`, `Side`, `Date`, `Position Size`, `Payment`, `Rate`).
+Funding exports explicitly request long and short sides separately: the live API can omit payments for `side=all`. They use ranges of at most 90 days and split further if an export reaches the row limit. Payments at overlapping boundaries are deduplicated by market, side, and UTC timestamp because the export has no funding ID. The funding table and CSV columns remain the same; rates retain the export's percentage precision. JSON retains the `position_fundings` envelope and contains the raw funding export CSV fields (`Market`, `Side`, `Date`, `Position Size`, `Payment`, `Rate`).
+
+### Historical account statements
+
+After connecting and selecting accounts, choose Monthly, Year-end, or Custom date and time in the Account Statements controls. Monthly statements use 00:00 UTC on the first day of the following month; year-end uses January 1 of the next year. Future cutoffs are rejected. January–September 2026 produces nine statements, ending at October 1, 2026 00:00 UTC.
+
+Statements reverse complete trades, funding, deposits, withdrawals and transfers from two consistent current account snapshots. Combined spot and margin quantities include isolated collateral, without double-counting locked balances. Native spot/perpetual trade records supplement rounded export fees and include integrator fees. This native history is capped by Lighter; missing records require review. Historical fast-withdrawal charges are checked independently against daily cumulative outflows on stablecoin-only days. Extra debits are disclosed, with timing known only to that UTC day; an intraday cutoff on an affected day requires review.
+
+USD valuations use the last completed one-minute spot candle, and open perpetual PnL uses historical mark candles. USDC (Core) or USDG (RH) is valued at USD 1 by a disclosed convention. Missing/stale prices, unmatched opening balances, pool/staking holdings, fee credits, leases, yield multipliers or other unsupported activity produce review notes and suppress a complete account-equity total. Quantities retain export rounding uncertainty. Outstanding withdrawal claims and external wallets are excluded.
+
+PDFs include one statement per cutoff plus reconciliation/evidence notes. CSV preserves raw reconstructed quantities and tolerances. JSON includes the report and original financial evidence, with a SHA-256 digest for reproducibility. These are exporter-generated reconstructions, not exchange-issued confirmations.
 
 ### Transaction Hash Types
 
@@ -83,9 +94,10 @@ Funding exports use ranges of at most 90 days and split further if an export rea
 | Auth | Read-only tokens from Lighter (user-provided) |
 | Data fetching | Client-side direct to Lighter API; signed trade and funding export files downloaded server-side |
 | Export processing | Server-side conversion of trade and funding export CSV into the existing display fields |
+| Account statements | Server-side Decimal reconstruction, historical valuation and PDF/CSV rendering; JSON assembled in the browser |
 | Asset mapping | Client-side with hourly cache |
 
-Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade and funding export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser; only the signed download URL is sent to the server. Download URLs are restricted to Lighter export buckets on Amazon S3, with redirects disabled.
+Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade and funding export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser. Bulk exports send a signed download URL to the server; account statements send financial snapshots and source activity for reconstruction. Statement processing does not persist those records, and statement responses use `Cache-Control: no-store`. Download URLs are restricted to Lighter export buckets on Amazon S3, with redirects disabled.
 
 ## API Endpoints
 
@@ -96,6 +108,8 @@ Lighter API requests are made directly from your browser, so API rate limits app
 | `/api/process-trades` | POST | Process raw trades (add market names, PnL) |
 | `/api/process-trades-export` | POST | Download and process a signed trade export CSV |
 | `/api/process-fundings-export` | POST | Download and process a signed funding export CSV |
+| `/api/account-statements` | POST | Reconstruct and value historical account statements from evidence (no credentials) |
+| `/api/account-statements/export` | POST | Render a statement report as PDF or CSV |
 | `/api/markets` | GET | Cached market details |
 
 ## Rate Limits
@@ -137,6 +151,7 @@ Strict-Transport-Security: max-age=31536000
 ## Tests
 
 ```bash
+pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 node --test tests/*.test.cjs
 ```

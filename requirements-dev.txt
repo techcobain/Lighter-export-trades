@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# PDF content/page verification in tests
+pypdf==6.1.3
