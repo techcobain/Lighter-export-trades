@@ -17,7 +17,8 @@ A web app to fetch and export trading data from [Lighter Exchange](https://light
 - **Click to copy** — Copy transaction hashes and addresses with one click
 - **Asset symbols** — Automatic mapping of asset IDs to symbols (cached hourly)
 - **Complete trade history** — Bulk exports bypass the 3,000-trade history cap, with automatic date-range splitting and rate-limit retries
-- **Automatic pagination** — Handles pagination for funding and wallet history
+- **Complete funding history** — Bulk exports in 90-day ranges, with boundary deduplication and rate-limit retries
+- **Automatic pagination** — Handles pagination for wallet history
 
 ## Quick Start
 
@@ -48,7 +49,7 @@ Visit `http://localhost:8000`
 | Type | Endpoint | Description |
 |------|----------|-------------|
 | **Trades** | `/api/v1/export?type=trade` | Trade history with PnL and fees from Lighter |
-| **Funding** | `/api/v1/positionFunding` | Funding payments on positions |
+| **Funding** | `/api/v1/export?type=funding` | Funding payments on positions |
 | **Deposits** | `/api/v1/deposit/history` | L1 deposits (Ethereum) |
 | **Transfers** | `/api/v1/transfer/history` | L2 transfers between accounts |
 | **Withdrawals** | `/api/v1/withdraw/history` | Withdrawals to L1/L2 (Arbitrum) |
@@ -60,6 +61,8 @@ Core uses `https://mainnet.zklighter.elliot.ai`; RH uses `https://api.rh.lighter
 Pool and staking events have separate result tables, account tabs, CSV downloads, and raw JSON downloads. The tables preserve incoming/outgoing cash-flow directions and pool account indexes. The Transfers view also includes all pool and staking event types.
 
 Trade exports use non-aggregated fills and automatically split history into ranges of at most 180 days. Ranges reaching Lighter's one-million-row export limit are split further, and overlapping boundaries are deduplicated by trade ID. The table, column selection, filters, CSV format, and JSON envelope remain the same. JSON trade records now contain the raw export CSV fields. Transaction hashes are blank because Lighter's export does not include them. Spot trades use Lighter's Buy/Sell labels.
+
+Funding exports use ranges of at most 90 days and split further if an export reaches the row limit. Payments at overlapping boundaries are deduplicated by market, side, and UTC timestamp because the export has no funding ID. The funding table and CSV columns remain the same; rates retain the export's percentage precision. JSON retains the `position_fundings` envelope and contains the raw funding export CSV fields (`Market`, `Side`, `Date`, `Position Size`, `Payment`, `Rate`).
 
 ### Transaction Hash Types
 
@@ -78,11 +81,11 @@ Trade exports use non-aggregated fills and automatically split history into rang
 | Component | Description |
 |-----------|-------------|
 | Auth | Read-only tokens from Lighter (user-provided) |
-| Data fetching | Client-side direct to Lighter API; signed trade export files downloaded server-side |
-| Trade processing | Server-side conversion of export CSV into the existing display fields |
+| Data fetching | Client-side direct to Lighter API; signed trade and funding export files downloaded server-side |
+| Export processing | Server-side conversion of trade and funding export CSV into the existing display fields |
 | Asset mapping | Client-side with hourly cache |
 
-Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser; only the signed download URL is sent to the server. Download URLs are restricted to Lighter export buckets on Amazon S3, with redirects disabled.
+Lighter API requests are made directly from your browser, so API rate limits apply to your IP. Trade and funding export files are downloaded by the server because Lighter's storage does not allow browser CORS access. The read-only token stays in the browser; only the signed download URL is sent to the server. Download URLs are restricted to Lighter export buckets on Amazon S3, with redirects disabled.
 
 ## API Endpoints
 
@@ -92,6 +95,7 @@ Lighter API requests are made directly from your browser, so API rate limits app
 | `/api/lookup-accounts` | POST | Get account indexes for L1 address |
 | `/api/process-trades` | POST | Process raw trades (add market names, PnL) |
 | `/api/process-trades-export` | POST | Download and process a signed trade export CSV |
+| `/api/process-fundings-export` | POST | Download and process a signed funding export CSV |
 | `/api/markets` | GET | Cached market details |
 
 ## Rate Limits
@@ -99,7 +103,7 @@ Lighter API requests are made directly from your browser, so API rate limits app
 | Data Type | Rate | Pages/Min |
 |-----------|------|-----------|
 | Trades | 3.5s between bulk exports; retries on HTTP 429/405 | Varies by export size |
-| Funding | 1s delay | ~60 |
+| Funding | 3.5s between bulk exports; retries on HTTP 429/405 | Varies by export size |
 | Deposits/Transfers/Withdrawals/Pools/Staking | 1s delay | ~60 |
 
 Close the Lighter frontend while fetching to avoid rate limit conflicts.

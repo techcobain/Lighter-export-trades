@@ -4,6 +4,7 @@ Lighter Trades Fetcher - Fetch and export trading history from Lighter exchange.
 
 import csv
 import io
+import math
 import re
 import time
 from datetime import datetime, timezone
@@ -32,6 +33,7 @@ ENDPOINT_RATE_LIMITS = {
     "/api/lookup-accounts": {"requests": 20, "window": 60},
     "/api/process-trades": {"requests": 30, "window": 60},
     "/api/process-trades-export": {"requests": 30, "window": 60},
+    "/api/process-fundings-export": {"requests": 30, "window": 60},
 }
 
 
@@ -110,7 +112,7 @@ class ProcessTradesRequest(BaseModel):
     network: Network = "core"
 
 
-class ProcessTradesExportRequest(BaseModel):
+class ProcessExportRequest(BaseModel):
     data_url: str
 
 
@@ -346,9 +348,45 @@ def process_export_csv(content: str) -> dict:
     }
 
 
-# API Endpoints
-@app.post("/api/process-trades-export")
-async def process_trades_export(request: ProcessTradesExportRequest):
+def process_funding_export_csv(content: str) -> dict:
+    """Map funding export columns; Rate is already a percentage in this CSV."""
+    csv_file = io.StringIO(content.lstrip("\ufeff"))
+    reader = csv.DictReader(csv_file, strict=True)
+    required_columns = {"Market", "Side", "Date", "Position Size", "Payment", "Rate"}
+    if not required_columns.issubset(reader.fieldnames or []):
+        raise ValueError("Unexpected funding export columns")
+    for count, row in enumerate(reader, start=1):
+        if None in row or any(row.get(column) is None for column in required_columns):
+            raise ValueError("Incomplete funding export row")
+        if count >= EXPORT_ROW_LIMIT:
+            return {"success": True, "limit_reached": True}
+
+    csv_file.seek(0)
+    raw_rows = []
+    processed = []
+    for row in csv.DictReader(csv_file, strict=True):
+        dt = datetime.strptime(row["Date"], "%Y-%m-%d %H:%M:%S")
+        rate = row["Rate"].strip()
+        if not rate.endswith("%") or row["Side"] not in ("long", "short") or not row["Market"].strip():
+            raise ValueError("Invalid funding export row")
+        rate_percent = rate[:-1].strip()
+        payment, size = float(row["Payment"]), float(row["Position Size"])
+        if not all(math.isfinite(value) for value in (payment, size, float(rate_percent))):
+            raise ValueError("Invalid funding export values")
+        raw_rows.append(row)
+        processed.append({
+            "market": row["Market"], "side": row["Side"],
+            "datetime_utc": dt.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "change_usd": payment, "rate_percent": rate_percent, "size": size,
+        })
+    processed.sort(key=lambda funding: funding["datetime_utc"], reverse=True)
+    return {
+        "success": True, "limit_reached": False, "total_fundings": len(processed),
+        "fundings": processed, "raw_fundings": raw_rows,
+    }
+
+
+async def download_export(request: ProcessExportRequest, processor, label: str):
     """Download a signed Lighter export and convert it without storing credentials."""
     try:
         url = urlsplit(request.data_url)
@@ -365,11 +403,22 @@ async def process_trades_export(request: ProcessTradesExportRequest):
         async with httpx.AsyncClient(timeout=120, follow_redirects=False) as client:
             response = await client.get(request.data_url)
             response.raise_for_status()
-        return process_export_csv(response.content.decode("utf-8-sig"))
+        return processor(response.content.decode("utf-8-sig"))
     except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="Failed to download trade export. Please fetch again.")
+        raise HTTPException(status_code=502, detail=f"Failed to download {label} export. Please fetch again.")
     except (ValueError, csv.Error, OverflowError):
-        raise HTTPException(status_code=502, detail="Invalid trade export data")
+        raise HTTPException(status_code=502, detail=f"Invalid {label} export data")
+
+
+# API Endpoints
+@app.post("/api/process-trades-export")
+async def process_trades_export(request: ProcessExportRequest):
+    return await download_export(request, process_export_csv, "trade")
+
+
+@app.post("/api/process-fundings-export")
+async def process_fundings_export(request: ProcessExportRequest):
+    return await download_export(request, process_funding_export_csv, "funding")
 
 
 @app.post("/api/lookup-accounts")

@@ -1453,7 +1453,7 @@
                         </div>
                         <div class="faq-answer">
                             <div class="faq-answer-content">
-                                Trades are fetched in bulk exports, with large histories split into date ranges automatically. Funding is fetched at ~3.6K payments per minute.
+                                Trades and funding are fetched in bulk exports, with large histories split into date ranges automatically. Funding exports use ranges of up to 90 days.
                                 You should close the Lighter front-end while using this app or you risk getting rate limited. 
                             </div>
                         </div>
@@ -2249,7 +2249,6 @@
             return selected;
         }
 
-        const FUNDING_RATE_LIMIT_DELAY = 1000; // 1s between funding calls (60/min limit)
         const WALLET_RATE_LIMIT_DELAY = 1000; // 1s between wallet calls (60/min limit)
         
         // Helper to disable/enable all fetch buttons
@@ -2717,100 +2716,14 @@
         
         // ===== FUNDING PAYMENTS =====
         
-        // Fetch funding from Lighter API
-        // For funding, there's no 'from' parameter, so we fetch from the beginning and filter
-        // Funding API: data comes in descending order (newest first)
-        // We fetch from the beginning and stop when we hit events older than fromTimestamp (start date)
+        // Funding exports use 90-day ranges and the selected Core/RH base URL.
         async function fetchFundingFromLighter(authToken, accountIndex, fromTimestamp = null, toTimestamp = null) {
-            const allFundings = [];
-            let cursor = null;
-            let page = 0;
-            let reachedStart = false;
-            
-            // Convert to seconds for funding API (uses seconds, not ms)
-            const fromSec = fromTimestamp ? Math.floor(fromTimestamp / 1000) : null;
-            const toSec = toTimestamp ? Math.floor(toTimestamp / 1000) : null;
-            
-            while (true) {
-                page++;
-                const params = new URLSearchParams({
-                    account_index: accountIndex,
-                    limit: 100
-                });
-                if (cursor) {
-                    params.append('cursor', cursor);
-                }
-                
-                const timeframeMsg = fromTimestamp ? ' (filtered)' : '';
-                showStatus('fetchStatus', `Account #${accountIndex}: Fetching funding page ${page}${timeframeMsg}...`, 'loading');
-                
-                try {
-                    const response = await fetch(`${LIGHTER_API}/api/v1/positionFunding?${params}`, {
-                        headers: { 'Authorization': authToken }
-                    });
-                    
-                    if (response.status === 429) {
-                        showStatus('fundingStatus', `Rate limited, waiting 15s...`, 'loading');
-                        await new Promise(r => setTimeout(r, 15000));
-                        continue;
-                    }
-                    
-                    if (!response.ok) {
-                        console.error(`HTTP error: ${response.status}`);
-                        break;
-                    }
-                    
-                    const data = await response.json();
-                    if (data.code !== 200) {
-                        console.error(`API error: ${data.code}`);
-                        break;
-                    }
-                    
-                    let fundings = data.position_fundings || [];
-                    
-                    // Data comes in descending order (newest first)
-                    // If we have a start timestamp, stop when we hit events older than it
-                    if (fromSec && fundings.length > 0) {
-                        const filteredFundings = [];
-                        for (const funding of fundings) {
-                            if (funding.timestamp >= fromSec) {
-                                // Event is within range (newer than or equal to start date)
-                                filteredFundings.push(funding);
-                            } else {
-                                // Event is older than start date - stop fetching
-                                reachedStart = true;
-                            }
-                        }
-                        fundings = filteredFundings;
-                    }
-                    
-                    allFundings.push(...fundings);
-                    
-                    if (!data.next_cursor || fundings.length === 0 || reachedStart) {
-                        break;
-                    }
-                    
-                    cursor = data.next_cursor;
-                    await new Promise(r => setTimeout(r, FUNDING_RATE_LIMIT_DELAY));
-                    
-                } catch (error) {
-                    console.error(`Error fetching funding: ${error}`);
-                    break;
-                }
-            }
-            
-            // Final filter to ensure all fundings are within the timeframe
-            if (fromSec || toSec) {
-                return allFundings.filter(funding => {
-                    const afterStart = fromSec ? funding.timestamp >= fromSec : true;
-                    const beforeEnd = toSec ? funding.timestamp <= toSec : true;
-                    return afterStart && beforeEnd;
-                });
-            }
-            
-            return allFundings;
+            return LighterTradeExport.fetchFundings({
+                apiBase: LIGHTER_API, authToken, accountIndex, fromTimestamp, toTimestamp,
+                onProgress: message => showStatus('fetchStatus', message, 'loading')
+            });
         }
-        
+
         // Fetch funding for all selected accounts
         async function fetchFunding() {
             if (!readOnlyToken) {
@@ -2836,19 +2749,17 @@
             btn.innerHTML = '<span class="spinner"></span>Fetching...';
             
             try {
+                document.getElementById('fundingCard').classList.add('hidden');
                 fundingData = {};
                 rawFundingData = {};
                 
                 for (const accountIndex of selectedAccounts) {
-                    const rawFundings = await fetchFundingFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
-                    rawFundingData[accountIndex] = rawFundings;
-                    
-                    // Process funding data
-                    const processed = await processFundingData(rawFundings, accountIndex);
+                    const result = await fetchFundingFromLighter(readOnlyToken, accountIndex, fromTimestamp, toTimestamp);
+                    rawFundingData[accountIndex] = result.raw_fundings;
                     fundingData[accountIndex] = {
                         success: true,
-                        total_fundings: processed.length,
-                        fundings: processed
+                        total_fundings: result.fundings.length,
+                        fundings: result.fundings
                     };
                 }
                 
@@ -2867,31 +2778,6 @@
                 setAllFetchButtonsDisabled(false);
                 btn.textContent = 'Fetch Funding';
             }
-        }
-        
-        // Process funding data (add market names, format values)
-        async function processFundingData(rawFundings, accountIndex) {
-            // Get market map from server
-            const response = await fetch('/api/markets');
-            const marketData = await response.json();
-            const marketMap = marketData.markets || {};
-            
-            return rawFundings.map(f => {
-                const marketName = marketMap[f.market_id] || `ID:${f.market_id}`;
-                const timestamp = f.timestamp * 1000; // Convert to ms
-                const dt = new Date(timestamp);
-                const dateStr = dt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-                
-                return {
-                    funding_id: f.funding_id,
-                    market: marketName,
-                    datetime_utc: dateStr,
-                    change_usd: parseFloat(f.change),
-                    rate_percent: (parseFloat(f.rate) * 100).toFixed(4),
-                    size: parseFloat(f.position_size),
-                    side: f.position_side
-                };
-            });
         }
         
         // Display funding results

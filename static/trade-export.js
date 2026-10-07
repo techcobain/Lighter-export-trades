@@ -7,17 +7,36 @@ const LighterTradeExport = (() => {
 
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-    async function fetchTrades({ apiBase, authToken, accountIndex,
-        fromTimestamp = null, toTimestamp = null, onProgress = () => {} }) {
+    const fundingKey = row => JSON.stringify([row.market, row.side, row.datetime_utc]);
+    const rawFundingKey = row => JSON.stringify([row.Market, row.Side, row.Date]);
+
+    function fetchTrades(options) {
+        return fetchData(options, {
+            type: 'trade', label: 'trade', plural: 'trades', raw: 'raw_trades',
+            maxWindow: MAX_WINDOW_MS,
+            key: row => String(row.trade_id), rawKey: row => String(row['Trade ID']),
+        });
+    }
+
+    function fetchFundings(options) {
+        return fetchData(options, {
+            type: 'funding', label: 'funding', plural: 'fundings', raw: 'raw_fundings',
+            maxWindow: 90 * 24 * 60 * 60 * 1000,
+            key: fundingKey, rawKey: rawFundingKey,
+        });
+    }
+
+    async function fetchData({ apiBase, authToken, accountIndex,
+        fromTimestamp = null, toTimestamp = null, onProgress = () => {} }, config) {
         const start = Math.max(fromTimestamp ?? GENESIS_MS, GENESIS_MS);
         const end = Math.min(toTimestamp ?? Date.now(), Date.now());
         if (!Number.isFinite(start) || !Number.isFinite(end)) {
-            throw new Error('Invalid trade export date range');
+            throw new Error(`Invalid ${config.label} export date range`);
         }
-        if (start > end) return { trades: [], raw_trades: [] };
+        if (start > end) return { [config.plural]: [], [config.raw]: [] };
 
-        const tradesById = new Map();
-        const rawById = new Map();
+        const recordsByKey = new Map();
+        const rawByKey = new Map();
         let requestCount = 0;
 
         async function requestJSON(url, options, allowEmptyExport = false) {
@@ -31,13 +50,13 @@ const LighterTradeExport = (() => {
                     continue;
                 }
                 if (!response.ok) {
-                    // Lighter uses this specific error for a valid range with no fills.
+                    // Lighter uses this specific error for a valid range with no records.
                     if (allowEmptyExport && response.status === 400) {
                         const data = await response.json();
                         if (data.code === 22504) return data;
                     }
                     // Never expose API messages that could include credentials or signed URLs.
-                    throw new Error(`Trade export failed (HTTP ${response.status}). Please try again.`);
+                    throw new Error(`${config.label} export failed (HTTP ${response.status}). Please try again.`);
                 }
                 return response.json();
             }
@@ -47,10 +66,10 @@ const LighterTradeExport = (() => {
             if (requestCount > 0) await wait(REQUEST_DELAY_MS);
             requestCount++;
             const dates = [rangeStart, rangeEnd].map(ms => new Date(ms).toISOString().slice(0, 10));
-            onProgress(`Account #${accountIndex}: Exporting ${dates[0]} to ${dates[1]} (${tradesById.size} trades fetched)...`);
+            onProgress(`Account #${accountIndex}: Exporting ${dates[0]} to ${dates[1]} (${recordsByKey.size} ${config.plural} fetched)...`);
             const params = new URLSearchParams({
                 account_index: accountIndex,
-                type: 'trade',
+                type: config.type,
                 aggregate: 'false',
                 start_timestamp: rangeStart,
                 end_timestamp: rangeEnd,
@@ -60,48 +79,48 @@ const LighterTradeExport = (() => {
             }, true);
             if (exported.code === 22504) return;
             if (exported.code !== 200 || !exported.data_url) {
-                throw new Error('Lighter could not create the trade export. Please try again.');
+                throw new Error(`Lighter could not create the ${config.label} export. Please try again.`);
             }
 
             onProgress(`Account #${accountIndex}: Downloading and processing export...`);
-            const processed = await requestJSON('/api/process-trades-export', {
+            const processed = await requestJSON(`/api/process-${config.plural}-export`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ data_url: exported.data_url }),
             });
-            if (!processed.success) throw new Error('Trade export processing failed.');
+            if (!processed.success) throw new Error(`${config.label} export processing failed.`);
             if (processed.limit_reached) {
-                // Overlap boundaries and deduplicate IDs to avoid dropping boundary fills.
+                // Overlap boundaries and deduplicate keys to preserve boundary records.
                 const middle = Math.floor((rangeStart + rangeEnd) / 2);
                 if (middle <= rangeStart || middle >= rangeEnd) {
-                    throw new Error('Too many trades in a single millisecond to export completely.');
+                    throw new Error(`Too many ${config.plural} in a single millisecond to export completely.`);
                 }
                 await fetchRange(rangeStart, middle);
                 await fetchRange(middle, rangeEnd);
                 return;
             }
-            if (!Array.isArray(processed.trades) || !Array.isArray(processed.raw_trades)
-                || processed.trades.length !== processed.raw_trades.length) {
-                throw new Error('Incomplete trade export response.');
+            if (!Array.isArray(processed[config.plural]) || !Array.isArray(processed[config.raw])
+                || processed[config.plural].length !== processed[config.raw].length) {
+                throw new Error(`Incomplete ${config.label} export response.`);
             }
-            for (const trade of processed.trades) tradesById.set(String(trade.trade_id), trade);
-            for (const row of processed.raw_trades) rawById.set(String(row['Trade ID']), row);
+            for (const record of processed[config.plural]) recordsByKey.set(config.key(record), record);
+            for (const row of processed[config.raw]) rawByKey.set(config.rawKey(row), row);
         }
 
         let rangeEnd = end;
         while (true) {
-            const rangeStart = Math.max(start, rangeEnd - MAX_WINDOW_MS);
+            const rangeStart = Math.max(start, rangeEnd - config.maxWindow);
             await fetchRange(rangeStart, rangeEnd);
             if (rangeStart === start) break;
             rangeEnd = rangeStart;
         }
 
-        const trades = Array.from(tradesById.values()).sort((a, b) =>
-            b.datetime_utc.localeCompare(a.datetime_utc) || b.trade_id - a.trade_id);
-        const rawTrades = Array.from(rawById.values()).sort((a, b) =>
-            b.Date.localeCompare(a.Date) || Number(b['Trade ID']) - Number(a['Trade ID']));
-        return { trades, raw_trades: rawTrades };
+        const records = Array.from(recordsByKey.values()).sort((a, b) =>
+            b.datetime_utc.localeCompare(a.datetime_utc) || config.key(b).localeCompare(config.key(a), undefined, { numeric: true }));
+        const rawRecords = Array.from(rawByKey.values()).sort((a, b) =>
+            b.Date.localeCompare(a.Date) || config.rawKey(b).localeCompare(config.rawKey(a), undefined, { numeric: true }));
+        return { [config.plural]: records, [config.raw]: rawRecords };
     }
 
-    return { fetchTrades };
+    return { fetchTrades, fetchFundings };
 })();

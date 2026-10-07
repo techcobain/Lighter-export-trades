@@ -8,7 +8,7 @@ const source = readFileSync(resolve(__dirname, '../static/trade-export.js'), 'ut
 const genesis = Date.UTC(2025, 0, 17);
 const windowMs = 180 * 86400000;
 
-function createExporter(handler) {
+function createExporter(handler, method = 'fetchTrades') {
     const calls = [];
     const sleeps = [];
     const context = vm.createContext({
@@ -21,7 +21,7 @@ function createExporter(handler) {
     });
     vm.runInContext(source, context);
     return {
-        run: options => vm.runInContext('LighterTradeExport.fetchTrades', context)({
+        run: options => vm.runInContext(`LighterTradeExport.${method}`, context)({
             apiBase: 'https://mainnet.zklighter.elliot.ai',
             authToken: 'ro:test-only', accountIndex: 42, ...options,
         }),
@@ -64,6 +64,81 @@ test('uses export with millisecond dates, preserves >3K fills, keeps auth out of
     assert.equal(result.trades.length, 3501);
     assert.equal(result.raw_trades.length, 3501);
     assert.equal(result.trades[0].trade_id, 3500);
+});
+
+function processedFunding(rows) {
+    return {
+        success: true, limit_reached: false,
+        fundings: rows.map(([market, side, date]) => ({ market, side, datetime_utc: `${date} UTC`,
+            change_usd: -0.000039, rate_percent: '0.000004', size: 0.0491 })),
+        raw_fundings: rows.map(([Market, Side, Date]) => ({ Market, Side, Date,
+            Payment: '-0.000039', Rate: '0.000004%', 'Position Size': '0.0491' })),
+    };
+}
+
+test('funding uses 90-day ranges on Core and RH and deduplicates only matching payments', async () => {
+    const fundingWindow = 90 * 86400000;
+    for (const apiBase of ['https://mainnet.zklighter.elliot.ai', 'https://api.rh.lighter.xyz']) {
+        let count = 0;
+        const ranges = [];
+        const exporter = createExporter((url, options) => {
+            if (url.startsWith('https://')) {
+                const parsed = new URL(url);
+                assert.equal(parsed.origin, apiBase);
+                assert.equal(parsed.pathname, '/api/v1/export');
+                assert.equal(parsed.searchParams.get('type'), 'funding');
+                assert.equal(parsed.searchParams.get('account_index'), '42');
+                assert.equal(options.headers.Authorization, 'ro:test-only');
+                ranges.push([Number(parsed.searchParams.get('start_timestamp')), Number(parsed.searchParams.get('end_timestamp'))]);
+                count++;
+                return response({ code: 200, data_url: 'https://storage.test/file' });
+            }
+            assert.equal(url, '/api/process-fundings-export');
+            assert.deepEqual(JSON.parse(options.body), { data_url: 'https://storage.test/file' });
+            assert.ok(!JSON.stringify(options).includes('ro:test-only'));
+            return response(processedFunding([
+                ['TTWO', 'long', '2026-01-01 16:00:00'],
+                ['TTWO', 'short', '2026-01-01 16:00:00'],
+                ['ETH', 'long', '2026-01-01 16:00:00'],
+                ['BTC', 'long', `2025-01-2${count} 16:00:00`],
+            ]));
+        }, 'fetchFundings');
+        const end = genesis + fundingWindow * 2 + 1;
+        const result = await exporter.run({ apiBase, fromTimestamp: genesis - 1000, toTimestamp: end });
+        assert.deepEqual(ranges, [[end - fundingWindow, end], [end - 2 * fundingWindow, end - fundingWindow], [genesis, end - 2 * fundingWindow]]);
+        assert.equal(result.fundings.length, 6);
+        assert.equal(result.raw_fundings.length, 6);
+        assert.equal(result.fundings[0].rate_percent, '0.000004');
+        assert.deepEqual(exporter.sleeps, [3500, 3500]);
+    }
+});
+
+test('funding splits capped ranges and rejects failed later exports', async () => {
+    let count = 0;
+    const exporter = createExporter(url => {
+        if (url.startsWith('https://')) return response({ code: 200, data_url: 'https://storage.test/file' });
+        count++;
+        return response(count === 1 ? { success: true, limit_reached: true }
+            : processedFunding([['TTWO', 'long', `2025-01-2${count} 16:00:00`]]));
+    }, 'fetchFundings');
+    assert.equal((await exporter.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 })).fundings.length, 2);
+    assert.equal(count, 3);
+    let exports = 0;
+    const failed = createExporter(url => {
+        if (!url.startsWith('https://')) return response(processedFunding([['TTWO', 'long', '2025-01-20 16:00:00']]));
+        return ++exports === 1 ? response({ code: 200, data_url: 'https://storage.test/file' }) : response({}, 500);
+    }, 'fetchFundings');
+    await assert.rejects(failed.run({ fromTimestamp: genesis, toTimestamp: genesis + 90 * 86400000 + 1 }), /HTTP 500/);
+});
+
+test('funding handles empty exports and bounded rate-limit retries', async () => {
+    let count = 0;
+    const exporter = createExporter(() => ++count === 1 ? response({}, 429, '2') : response({ code: 22504 }, 400), 'fetchFundings');
+    assert.equal((await exporter.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 })).fundings.length, 0);
+    assert.deepEqual(exporter.sleeps, [2000]);
+    const failed = createExporter(() => response({}, 405), 'fetchFundings');
+    await assert.rejects(failed.run({ fromTimestamp: genesis, toTimestamp: genesis + 1000 }), /HTTP 405/);
+    assert.equal(failed.calls.length, 6);
 });
 
 test('complete history spans multiple ranges and deduplicates boundary trades', async () => {
@@ -169,6 +244,7 @@ test('trade table formatting and CSV/JSON downloads retain their output structur
     const appSource = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
     const blobs = [];
     const downloads = [];
+    const hrefs = [];
     const context = vm.createContext({
         console, Date, Blob,
         URL: { createObjectURL: blob => { blobs.push(blob); return 'blob:test'; }, revokeObjectURL: () => {} },
@@ -176,7 +252,7 @@ test('trade table formatting and CSV/JSON downloads retain their output structur
         alert: message => { throw new Error(message); },
         document: {
             body: { appendChild: () => {} },
-            createElement: () => ({ style: {}, click() { downloads.push(this.download); }, remove() {} }),
+            createElement: () => ({ style: {}, click() { downloads.push(this.download); hrefs.push(this.href); }, remove() {} }),
         },
     });
     vm.runInContext(readFileSync(resolve(__dirname, '../static/pool-history.js'), 'utf8'), context);
@@ -200,4 +276,34 @@ test('trade table formatting and CSV/JSON downloads retain their output structur
     assert.match(vm.runInContext("formatCell({side: 'Buy'}, 'side')", context), /trade-side long/);
     assert.match(vm.runInContext("formatCell({tx_hash: ''}, 'tx_hash')", context), /N\/A/);
     assert.match(vm.runInContext("formatCell({pnl_usd: null}, 'pnl_usd')", context), /^-$/);
+
+    const funding = processedFunding([['TTWO', 'long', '2026-10-01 16:00:00']]);
+    context.fundingResult = funding;
+    vm.runInContext(`
+        fundingData = {42: {fundings: fundingResult.fundings}};
+        rawFundingData = {42: fundingResult.raw_fundings};
+        exportFundingCSV(42);
+        exportFundingJSON(42);
+    `, context);
+    assert.equal(decodeURIComponent(hrefs[2].split(',')[1]), '\ufeffMarket,Date/Time,Change ($),Rate (%),Size,Side\n"TTWO","2026-10-01 16:00:00 UTC",-0.000039,0.000004,0.0491,"long"');
+    const fundingJson = JSON.parse(await blobs[2].text());
+    assert.deepEqual(Object.keys(fundingJson), ['exported_at', 'account_index', 'total_fundings', 'position_fundings']);
+    assert.deepEqual(fundingJson.position_fundings, funding.raw_fundings);
+    assert.equal(fundingJson.total_fundings, 1);
+    assert.match(downloads[2], /^lighter_funding_account_42_.*\.csv$/);
+    assert.match(downloads[3], /^lighter_funding_account_42_.*\.json$/);
+    const table = vm.runInContext('buildFundingTable(fundingResult.fundings)', context);
+    assert.match(table, /0\.000004%/);
+    assert.match(table, /\$-0\.000039/);
+
+    context.LighterTradeExport = { fetchFundings: options => {
+        assert.equal(options.apiBase, 'https://api.rh.lighter.xyz');
+        assert.equal(options.fromTimestamp, genesis);
+        assert.equal(options.toTimestamp, genesis + 1000);
+        assert.equal(options.authToken, 'ro:test-only');
+        assert.equal(options.accountIndex, 42);
+        return funding;
+    } };
+    vm.runInContext("LIGHTER_API = 'https://api.rh.lighter.xyz'", context);
+    assert.equal(await vm.runInContext(`fetchFundingFromLighter('ro:test-only', 42, ${genesis}, ${genesis + 1000})`, context), funding);
 });
